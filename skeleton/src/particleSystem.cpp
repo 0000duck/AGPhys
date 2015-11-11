@@ -3,10 +3,9 @@
 #include "saiga/geometry/grid.h"
 #include "saiga/opengl/shader/shaderLoader.h"
 
-
-//#define GRID
+#define GRID
 //#define STAR
-#define VOLCANO
+//#define VOLCANO
 
 
 ParticleSystem::ParticleSystem()
@@ -42,14 +41,13 @@ void ParticleSystem::init()
     interop.map();
     void* devPtr = interop.getDevicePtr();
     
-    
     // to change the system's type, modify the defines at the top of this file
      
     #ifdef GRID
-    int xGrid = 3;
-    int zGrid = 3;
-    float cornerX = 0.0f, cornerY = 0.0f, cornerZ = 0.0f;
-    float distance = 1.0f;
+    int xGrid = 5;
+    int zGrid = 9;
+    float cornerX = 1.0f, cornerY = 0.0f, cornerZ = 0.0f;
+    float distance = 2.0f;
     CUDA::resetParticlesGrid(devPtr, particleCount, xGrid, zGrid, cornerX, cornerY, cornerZ, distance);
     #endif
     
