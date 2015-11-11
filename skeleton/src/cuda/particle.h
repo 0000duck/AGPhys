@@ -34,7 +34,6 @@ public:
     vec3_t impulse;
     float lifetime;
     
-    vec4_t initial_color;
     vec3_t initial_position;
 	float max_lifetime;
 
@@ -52,6 +51,6 @@ public:
     void integrateParticlesStar(void* particles, int numberOfParticles, float dt);
     
     // volcano
-    void integrateParticlesVolcano(void* particles, int numberOfParticles, float dt);
+    void integrateParticlesVolcano(void* particles, int numberOfParticles, float maxangle, float dt);
 	void resetParticlesVolcanoAndStar(void* particles, int numberOfParticles);
 }

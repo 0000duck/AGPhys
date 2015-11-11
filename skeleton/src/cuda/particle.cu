@@ -9,6 +9,11 @@
 
 #include "particle.h"
 
+// Converts degrees to radians.
+#define degreesToRadians(angleDegrees) (angleDegrees * 3.14159265359 / 180.0)
+// Converts radians to degrees.
+#define radiansToDegrees(angleRadians) (angleRadians * 180.0 / 3.14159265359)
+
 using std::cout;
 using std::endl;
 
@@ -169,21 +174,16 @@ __global__ void resetParticlesGrid(Particle* particles, int numberOfParticles, i
 	int tid = threadIdx.y * x * z + threadIdx.z * x + threadIdx.x;
 	if (tid < numberOfParticles)
 	{
-		particles[tid].initial_position.x = threadIdx.x * distance + cornerX;
-		particles[tid].initial_position.y = threadIdx.y * distance + cornerY;
-		particles[tid].initial_position.z = threadIdx.z * distance + cornerZ;
+		particles[tid].position.x = threadIdx.x * distance + cornerX;
+		particles[tid].position.y = threadIdx.y * distance + cornerY;
+		particles[tid].position.z = threadIdx.z * distance + cornerZ;
 		
-		particles[tid].initial_color.x = 1.0;
-		particles[tid].initial_color.y = 0.0;
-		particles[tid].initial_color.z = 0.0;
-		particles[tid].initial_color.w = 1.0;
+		particles[tid].color.x = 1.0;
+		particles[tid].color.y = 0.0;
+		particles[tid].color.z = 0.0;
+		particles[tid].color.w = 1.0;
 		
-		particles[tid].position = particles[tid].initial_position;
-		particles[tid].color	= particles[tid].initial_color;
-		
-		particles[tid].impulse.x = 0;
-		particles[tid].impulse.y = 0.1;
-		particles[tid].impulse.z = 0;
+		particles[tid].impulse = make_float3(0);
 		
 		particles[tid].max_lifetime = 100;
 		particles[tid].lifetime = particles[tid].max_lifetime;
@@ -196,13 +196,16 @@ __device__ void integrateSingleParticleStar(Particle* particle, float dt, curand
 	
 	particle->position += dt * particle->impulse;
 	particle->lifetime -= dt;
-	particle->color.z = particle->lifetime / particle->max_lifetime;
+	particle->color.x = particle->lifetime / particle->max_lifetime;
+	particle->color.z = 1.0 - particle->lifetime / particle->max_lifetime;
 	
 	if (particle->lifetime < 0)
 	{
 		particle->position 	= make_float3(0);
-		particle->color 	= particle->initial_color;
+		particle->color.x	= 1.0;
+		particle->color.z	= 0.0;
 		
+		// travel distance is influenced by both impulse and max_lifetime
 		particle->impulse = noise3D(state, make_float3(-1), make_float3(1));
 		
 		particle->max_lifetime 	= noise(state, 5, 8);
@@ -218,33 +221,35 @@ __global__ void integrateParticlesStar(Particle* particles, float dt, curandStat
 	integrateSingleParticleStar(&particles[tid], dt, state);
 }
 
-__device__ void integrateSingleParticleVolcano(Particle* particle, float dt, curandState* state)
+__device__ void integrateSingleParticleVolcano(Particle* particle, float maxangle, float dt, curandState* state)
 {
 	// VOLCANO
 	
 	particle->position += dt * particle->impulse;
 	particle->lifetime -= dt;
-	particle->color.z = particle->lifetime / particle->max_lifetime;
+	particle->color.x = particle->lifetime / particle->max_lifetime;
+	particle->color.z = 1.0 - particle->lifetime / particle->max_lifetime;
 	
 	if (particle->lifetime < 0)
 	{
 		particle->position 	= make_float3(0);
-		particle->color 	= particle->initial_color;
+		particle->color.x 	= 1.0;
+		particle->color.z 	= 0.0;
 		
 		vec3_t impulse; impulse.x = 0; impulse.y = 1; impulse.z = 0;
-		particle->impulse = distractDirection3D(state, impulse, 0.45);
+		particle->impulse = distractDirection3D(state, impulse, degreesToRadians(maxangle));
 		
-		particle->max_lifetime 	= noise(state, 5, 18);
+		particle->max_lifetime 	= noise(state, 5, 8);
 		particle->lifetime		= particle->max_lifetime;
 	}
 }
 
-__global__ void integrateParticlesVolcano(Particle* particles, float dt, curandState* state)
+__global__ void integrateParticlesVolcano(Particle* particles, float maxangle, float dt, curandState* state)
 {
 	// VOLCANO
 	
 	int tid = threadIdx.x;
-	integrateSingleParticleVolcano(&particles[tid], dt, state);
+	integrateSingleParticleVolcano(&particles[tid], maxangle, dt, state);
 }
 
 __global__ void resetParticlesVolcanoAndStar(Particle* particles)
@@ -252,10 +257,10 @@ __global__ void resetParticlesVolcanoAndStar(Particle* particles)
 	int tid = threadIdx.x;
 	particles[tid].lifetime = 0;
 	
-	particles[tid].initial_color.x = 1.0;
-	particles[tid].initial_color.y = 0.0;
-	particles[tid].initial_color.z = 0.0;
-	particles[tid].initial_color.w = 1.0;
+	particles[tid].color.x = 1.0;
+	particles[tid].color.y = 0.0;
+	particles[tid].color.z = 0.0;
+	particles[tid].color.w = 1.0;
 }
 
 __global__ void setupRandomNumberState(curandState* state, unsigned long seed)
@@ -292,12 +297,12 @@ void resetParticlesVolcanoAndStar(void* particles, int numberOfParticles)
 	resetParticlesVolcanoAndStar<<<1, threads>>>(static_cast<Particle*>(particles));
 }
 
-void integrateParticlesVolcano(void* particles, int numberOfParticles, float dt)
+void integrateParticlesVolcano(void* particles, int numberOfParticles, float maxangle, float dt)
 {
 	curandState* state = buildStates(numberOfParticles);
 	
     dim3 threads(numberOfParticles, 1, 1);
-    integrateParticlesVolcano<<<1, threads>>>(static_cast<Particle*>(particles), dt, state);
+    integrateParticlesVolcano<<<1, threads>>>(static_cast<Particle*>(particles), maxangle, dt, state);
     
     freeStates(state);
 }

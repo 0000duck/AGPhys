@@ -5,8 +5,8 @@
 
 
 //#define GRID
-#define STAR
-//#define VOLCANO
+//#define STAR
+#define VOLCANO
 
 
 ParticleSystem::ParticleSystem()
@@ -77,7 +77,8 @@ void ParticleSystem::update(float dt){
     #endif
     
     #ifdef VOLCANO
-    CUDA::integrateParticlesVolcano(devPtr, particleCount, dt);
+    float maxAngle = 30.f; // Angle of volcano outburst in degrees
+    CUDA::integrateParticlesVolcano(devPtr, particleCount, maxAngle, dt);
     #endif
     interop.unmap();
 }
