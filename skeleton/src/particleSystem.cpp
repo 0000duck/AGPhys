@@ -4,6 +4,11 @@
 #include "saiga/opengl/shader/shaderLoader.h"
 
 
+//#define GRID
+#define STAR
+//#define VOLCANO
+
+
 ParticleSystem::ParticleSystem()
 {
 
@@ -37,22 +42,43 @@ void ParticleSystem::init()
     interop.map();
     void* devPtr = interop.getDevicePtr();
     
+    
+    // to change the system's type, modify the defines at the top of this file
+     
+    #ifdef GRID
     int xGrid = 3;
     int zGrid = 3;
     float cornerX = 0.0f, cornerY = 0.0f, cornerZ = 0.0f;
     float distance = 1.0f;
+    CUDA::resetParticlesGrid(devPtr, particleCount, xGrid, zGrid, cornerX, cornerY, cornerZ, distance);
+    #endif
     
-    CUDA::resetParticles(devPtr, particleCount, xGrid, zGrid, cornerX, cornerY, cornerZ, distance);
+    #ifdef STAR
+    CUDA::resetParticlesVolcanoAndStar(devPtr, particleCount);
+    #endif
+    
+    #ifdef VOLCANO
+    CUDA::resetParticlesVolcanoAndStar(devPtr, particleCount);
+    #endif
+    
     interop.unmap();
-    
-    //CUDA::printRandoms(10);
 }
 
 void ParticleSystem::update(float dt){
     //Modify particle buffer with cuda here
     interop.map();
     void* devPtr = interop.getDevicePtr();
-    CUDA::integrateParticles(devPtr, particleCount, dt);
+    #ifdef GRID
+    // do nothing
+    #endif
+    
+    #ifdef STAR
+    CUDA::integrateParticlesStar(devPtr, particleCount, dt);
+    #endif
+    
+    #ifdef VOLCANO
+    CUDA::integrateParticlesVolcano(devPtr, particleCount, dt);
+    #endif
     interop.unmap();
 }
 

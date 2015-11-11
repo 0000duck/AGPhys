@@ -3,6 +3,7 @@
 #include <curand.h>
 #include <curand_kernel.h>
 #include <iostream>
+#include <ctime>
 #include "helper_math.h"	// overload operators for floatN
 #include "helper_cuda.h"
 
@@ -162,7 +163,7 @@ __device__ vec3_t distractDirection3D(curandState* state, vec3_t origDirection, 
 	return direction;
 }
 
-__global__ void resetParticles(Particle* particles, int numberOfParticles, int x, int z, float cornerX, float cornerY, float cornerZ, float distance)
+__global__ void resetParticlesGrid(Particle* particles, int numberOfParticles, int x, int z, float cornerX, float cornerY, float cornerZ, float distance)
 {
 	
 	int tid = threadIdx.y * x * z + threadIdx.z * x + threadIdx.x;
@@ -189,32 +190,72 @@ __global__ void resetParticles(Particle* particles, int numberOfParticles, int x
 	}
 }
 
-__device__ void integrateSingleParticle(Particle* particle, float dt, curandState* state)
+__device__ void integrateSingleParticleStar(Particle* particle, float dt, curandState* state)
 {
+	// STAR
+	
 	particle->position += dt * particle->impulse;
 	particle->lifetime -= dt;
 	particle->color.z = particle->lifetime / particle->max_lifetime;
 	
 	if (particle->lifetime < 0)
 	{
-		vec3_t min; min.x = 0; min.y = 0; min.z = 0;
-		vec3_t max; max.x = 15; max.y = 15; max.z = 15;
-		//particle->position 	= noise3D(state, min, max);
 		particle->position 	= make_float3(0);
 		particle->color 	= particle->initial_color;
 		
-		vec3_t impulse; impulse.x = 1; impulse.y = 1; impulse.z = 0;
-		particle->impulse = distractDirection3D(state, impulse, 0.12);
+		particle->impulse = noise3D(state, make_float3(-1), make_float3(1));
 		
-		particle->max_lifetime 	= noise(state, 100, 115);
+		particle->max_lifetime 	= noise(state, 5, 8);
 		particle->lifetime		= particle->max_lifetime;
 	}
 }
 
-__global__ void integrateParticles(Particle* particles, float dt, curandState* state)
+__global__ void integrateParticlesStar(Particle* particles, float dt, curandState* state)
+{
+	// STAR
+	
+	int tid = threadIdx.x;
+	integrateSingleParticleStar(&particles[tid], dt, state);
+}
+
+__device__ void integrateSingleParticleVolcano(Particle* particle, float dt, curandState* state)
+{
+	// VOLCANO
+	
+	particle->position += dt * particle->impulse;
+	particle->lifetime -= dt;
+	particle->color.z = particle->lifetime / particle->max_lifetime;
+	
+	if (particle->lifetime < 0)
+	{
+		particle->position 	= make_float3(0);
+		particle->color 	= particle->initial_color;
+		
+		vec3_t impulse; impulse.x = 0; impulse.y = 1; impulse.z = 0;
+		particle->impulse = distractDirection3D(state, impulse, 0.45);
+		
+		particle->max_lifetime 	= noise(state, 5, 18);
+		particle->lifetime		= particle->max_lifetime;
+	}
+}
+
+__global__ void integrateParticlesVolcano(Particle* particles, float dt, curandState* state)
+{
+	// VOLCANO
+	
+	int tid = threadIdx.x;
+	integrateSingleParticleVolcano(&particles[tid], dt, state);
+}
+
+__global__ void resetParticlesVolcanoAndStar(Particle* particles)
 {
 	int tid = threadIdx.x;
-	integrateSingleParticle(&particles[tid], dt, state);
+	particles[tid].lifetime = 0;
+	
+	particles[tid].initial_color.x = 1.0;
+	particles[tid].initial_color.y = 0.0;
+	particles[tid].initial_color.z = 0.0;
+	particles[tid].initial_color.w = 1.0;
 }
 
 __global__ void setupRandomNumberState(curandState* state, unsigned long seed)
@@ -225,9 +266,10 @@ __global__ void setupRandomNumberState(curandState* state, unsigned long seed)
 
 static curandState* buildStates(int numberOfStates)
 {
+	unsigned long seed = std::time(NULL);
 	curandState* state;
 	cudaMalloc((void **) &state, numberOfStates * sizeof(curandState));
-	setupRandomNumberState<<<1, numberOfStates>>>(state, 1234);
+	setupRandomNumberState<<<1, numberOfStates>>>(state, seed);
 	return state;
 }
 
@@ -236,20 +278,36 @@ static void freeStates(curandState* state)
 	cudaFree(state);
 }
 
-void resetParticles(void* particles, int numberOfParticles, int x, int z, float cornerX, float cornerY, float cornerZ, float distance)
+void resetParticlesGrid(void* particles, int numberOfParticles, int x, int z, float cornerX, float cornerY, float cornerZ, float distance)
 {
 	int y = numberOfParticles / (x * z);
 	if (numberOfParticles % (x * z) > 0) y++;
     dim3 threads(x, y, z);
-	resetParticles<<<1, threads>>>(static_cast<Particle*>(particles), numberOfParticles, x, z, cornerX, cornerY, cornerZ, distance);
+	resetParticlesGrid<<<1, threads>>>(static_cast<Particle*>(particles), numberOfParticles, x, z, cornerX, cornerY, cornerZ, distance);
 }
 
-void integrateParticles(void* particles, int numberOfParticles, float dt)
+void resetParticlesVolcanoAndStar(void* particles, int numberOfParticles)
+{
+	dim3 threads(numberOfParticles, 1, 1);
+	resetParticlesVolcanoAndStar<<<1, threads>>>(static_cast<Particle*>(particles));
+}
+
+void integrateParticlesVolcano(void* particles, int numberOfParticles, float dt)
 {
 	curandState* state = buildStates(numberOfParticles);
 	
     dim3 threads(numberOfParticles, 1, 1);
-    integrateParticles<<<1, threads>>>(static_cast<Particle*>(particles), dt, state);
+    integrateParticlesVolcano<<<1, threads>>>(static_cast<Particle*>(particles), dt, state);
+    
+    freeStates(state);
+}
+
+void integrateParticlesStar(void* particles, int numberOfParticles, float dt)
+{
+	curandState* state = buildStates(numberOfParticles);
+	
+    dim3 threads(numberOfParticles, 1, 1);
+    integrateParticlesStar<<<1, threads>>>(static_cast<Particle*>(particles), dt, state);
     
     freeStates(state);
 }
