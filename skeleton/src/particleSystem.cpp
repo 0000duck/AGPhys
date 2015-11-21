@@ -3,13 +3,9 @@
 #include "saiga/geometry/grid.h"
 #include "saiga/opengl/shader/shaderLoader.h"
 
-<<<<<<< HEAD
 //#define GRID
-=======
-#define GRID
->>>>>>> cc15008e98bd5bd707b57c1c35f633ac156bf3f3
 //#define STAR
-//#define VOLCANO
+#define VOLCANO
 
 
 ParticleSystem::ParticleSystem()
@@ -36,14 +32,14 @@ void ParticleSystem::init()
     //upload particle array to opengl
     particleBuffer.set(particles);
     particleBuffer.setDrawMode(GL_POINTS);
-    
+
     interop.registerGLBuffer(particleBuffer.getVBO());
-    
+
     interop.map();
     void* devPtr = interop.getDevicePtr();
-    
+
     // to change the system's type, modify the defines at the top of this file
-     
+
     #ifdef GRID
     int xGrid = 5;
     int zGrid = 9;
@@ -51,15 +47,15 @@ void ParticleSystem::init()
     float distance = 2.0f;
     CUDA::resetParticlesGrid(devPtr, particleCount, xGrid, zGrid, cornerX, cornerY, cornerZ, distance);
     #endif
-    
+
     #ifdef STAR
     CUDA::resetParticlesVolcanoAndStar(devPtr, particleCount);
     #endif
-    
+
     #ifdef VOLCANO
     CUDA::resetParticlesVolcanoAndStar(devPtr, particleCount);
     #endif
-    
+
     interop.unmap();
 }
 
@@ -70,11 +66,11 @@ void ParticleSystem::update(float dt){
     #ifdef GRID
     // do nothing
     #endif
-    
+
     #ifdef STAR
     CUDA::integrateParticlesStar(devPtr, particleCount, dt);
     #endif
-    
+
     #ifdef VOLCANO
     float maxAngle = 30.f; // Angle of volcano outburst in degrees
     CUDA::integrateParticlesVolcano(devPtr, particleCount, maxAngle, dt);
@@ -123,7 +119,3 @@ void VertexBuffer<CUDA::Particle>::setVertexAttributes(){
     glVertexAttribPointer(2,4, GL_FLOAT, GL_FALSE, sizeof(CUDA::Particle), (void*) (4 * sizeof(GLfloat)) );
 
 }
-
-
-
-
