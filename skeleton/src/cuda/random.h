@@ -1,5 +1,11 @@
 #pragma once
 
+<<<<<<< HEAD
+=======
+#ifndef RANDOM_H
+#define RANDOM_H
+
+>>>>>>> cc15008e98bd5bd707b57c1c35f633ac156bf3f3
 #include <ctime>
 #include <curand.h>
 #include <curand_kernel.h>
@@ -101,3 +107,8 @@ void shutdownRandom()
 	cudaFree(random_states_host);
 	initializedRandom = false;
 }
+<<<<<<< HEAD
+=======
+
+#endif
+>>>>>>> cc15008e98bd5bd707b57c1c35f633ac156bf3f3

@@ -3,9 +3,13 @@
 #include "saiga/geometry/grid.h"
 #include "saiga/opengl/shader/shaderLoader.h"
 
+<<<<<<< HEAD
 //#define GRID
+=======
+#define GRID
+>>>>>>> cc15008e98bd5bd707b57c1c35f633ac156bf3f3
 //#define STAR
-#define VOLCANO
+//#define VOLCANO
 
 
 ParticleSystem::ParticleSystem()
