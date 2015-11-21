@@ -20,18 +20,19 @@ void myRenderer::init()
      ObjLoader::instance()->addPath("objs");
      MaterialLoader::instance()->addPath("objs");
 
-    gridShader = ShaderLoader::instance()->load<MVPColorShader>("grid.glsl");
-    Grid g(vec3(0),vec3(0,0,1),vec3(1,0,0));
-    g.createBuffers(grid,10,10);
+    //gridShader = ShaderLoader::instance()->load<MVPColorShader>("grid.glsl");
+    //Grid g(vec3(0),vec3(0,0,1),vec3(1,0,0));
+    //g.createBuffers(grid,10,10);
 
-    particleSystem.init();
-
+    //particleSystem.init();
+    collisionSystem.init();
 
     cout<<"Renderer Initialized!"<<endl;
 }
 
 void myRenderer::update(float dt){
-    particleSystem.update(dt);
+    //particleSystem.update(dt);
+    collisionSystem.update(dt);
 }
 
 void myRenderer::render(Camera *cam)
@@ -42,14 +43,15 @@ void myRenderer::render(Camera *cam)
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
 
-    gridShader->bind();
-    gridShader->uploadAll(mat4(),cam->view,cam->proj);
-    gridShader->uploadColor(vec4(0.7f));
-    grid.bindAndDraw();
-    gridShader->unbind();
+    //gridShader->bind();
+    //gridShader->uploadAll(mat4(),cam->view,cam->proj);
+    //gridShader->uploadColor(vec4(0.7f));
+    //grid.bindAndDraw();
+    //gridShader->unbind();
 
 
-    particleSystem.render(cam);
+    //particleSystem.render(cam);
+    collisionSystem.render(cam);
 }
 
 

@@ -1,0 +1,1 @@
+make -j4 -C build/ && ./build/src/agphys

@@ -2,6 +2,7 @@
 
 #include <saiga/config.h>
 #include "saiga/util/glm.h"
+#include <cuda_runtime.h>
 
 class SAIGA_GLOBAL Plane
 {
@@ -24,5 +25,4 @@ public:
 
    friend std::ostream& operator<<(std::ostream& os, const Plane& ca);
 };
-
 

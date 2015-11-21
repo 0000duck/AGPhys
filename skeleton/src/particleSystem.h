@@ -12,7 +12,7 @@ class ParticleSystem : public SDL_KeyListener
 {
 public:
 
-    int particleCount = 100;
+    int particleCount = 100000;
     VertexBuffer<CUDA::Particle> particleBuffer;
     MVPShader* particleShader;
 

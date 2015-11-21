@@ -6,6 +6,7 @@
 #include "cuda/particle.h"
 #include "camera.h"
 #include "particleSystem.h"
+#include "collisionSystem.h"
 
 
 class myRenderer
@@ -16,6 +17,7 @@ public:
     VertexBuffer<VertexN> grid;
     MVPColorShader* gridShader;
     ParticleSystem particleSystem;
+    CollisionSystem collisionSystem;
 
     myRenderer();
     ~myRenderer();
