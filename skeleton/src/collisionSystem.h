@@ -14,6 +14,7 @@ class CollisionSystem : public SDL_KeyListener
 public:
 
     int sphereCount = 100;
+    int planeCount = 0;
 
     VertexBuffer<CUDA::Sphere> sphereBuffer;
     VertexBuffer<CUDA::Plane> planeBuffer;

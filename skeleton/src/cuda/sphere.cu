@@ -6,13 +6,10 @@
 #include "helper_cuda.h"
 
 #include "sphere.h"
+#include "collision.h"
 
 namespace CUDA {
 
-__device__ void collideSpherePlane(Sphere* sphere, Plane* plane)
-{
-
-}
 
 __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes, float dt)
 {
@@ -20,7 +17,41 @@ __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSphere
 
     if (tid < numberOfSpheres)
     {
-        spheres[tid].position += dt * spheres[tid].impulse;
+        Sphere& sphere = spheres[tid];
+
+        IntersectionData firstIntersection = make_intersectiondata();
+
+        // COLLIDE PLANES
+        for (int p = 0; p < numberOfPlanes; ++p)
+        {
+            Plane& plane = planes[p];
+            IntersectionData currentIntersection = collideSpherePlane(&sphere, &plane, dt);
+
+            if (currentIntersection.intersects)
+            {
+                if (!firstIntersection.intersects || currentIntersection.colTime < firstIntersection.colTime)
+                {
+                    firstIntersection = currentIntersection;
+                }
+            }
+        }
+
+        // TODO: COLLIDE SPHERES
+
+
+        // UPDATE SPHERE
+        if (firstIntersection.intersects)
+        {
+            sphere.impulse += firstIntersection.colTime * make_float3(0, -1, 0);
+            sphere.impulse = 0.75 * reflect(sphere.impulse, firstIntersection.colNormal);
+            sphere.position = firstIntersection.lastValidPos1;
+        }
+        else
+        {
+            sphere.impulse += dt * make_float3(0, -1, 0);
+            sphere.position += dt * sphere.impulse;
+        }
+
     }
 }
 

@@ -20,7 +20,7 @@ void CollisionSystem::init()
     //initialize spheres with some random values
     std::vector<CUDA::Sphere> spheres(sphereCount);
     for(CUDA::Sphere& p : spheres){
-        p.position = glm::ballRand(5.0f);
+        p.position = glm::ballRand(5.0f) + vec3(0, 10, 0);
         p.radius = 0.5f;
         p.color = glm::linearRand(vec4(0,0,0,1),vec4(1,1,1,1));
         p.impulse = vec3(0, -1, 0);
@@ -33,12 +33,19 @@ void CollisionSystem::init()
 
 
     // initialize planes
-    std::vector<CUDA::Plane> planes(1);
-    planes[0].center = vec3(0);
-    planes[0].normal = vec3(0, 1, 0);
-    planes[0].d     = -glm::dot(planes[0].center, planes[0].normal);
-    planes[0].d1    = vec3(10, 0, 0);
+    planeCount = 2;
+    std::vector<CUDA::Plane> planes(planeCount);
+    planes[0].center = vec3(10, 0, 0);
+    planes[0].normal = normalize(vec3(-1, 1, 0));
+    planes[0].d     = glm::dot(planes[0].center, planes[0].normal);
+    planes[0].d1    = vec3(10, 10, 0);
     planes[0].d2    = vec3(0, 0, 10);
+
+    planes[1].center = vec3(-10, 0, 0);
+    planes[1].normal = normalize(vec3(1, 1, 0));
+    planes[1].d     = glm::dot(planes[0].center, planes[0].normal);
+    planes[1].d1    = vec3(-10, 10, 0);
+    planes[1].d2    = vec3(0, 0, 10);
 
     planeBuffer.set(planes);
     planeBuffer.setDrawMode(GL_POINTS);
@@ -61,7 +68,7 @@ void CollisionSystem::update(float dt){
     void* planes = plane_interop.getDevicePtr();
 
     // TODO: update
-    CUDA::updateAllSpheres(static_cast<CUDA::Sphere*>(spheres), static_cast<CUDA::Plane*>(planes), sphereCount, 1, dt);
+    CUDA::updateAllSpheres(static_cast<CUDA::Sphere*>(spheres), static_cast<CUDA::Plane*>(planes), sphereCount, planeCount, dt);
 
     plane_interop.unmap();
     sphere_interop.unmap();
