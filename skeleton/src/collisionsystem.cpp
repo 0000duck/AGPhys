@@ -17,14 +17,31 @@ void CollisionSystem::init()
     sphereShader = ShaderLoader::instance()->load<MVPShader>("particles.glsl");
     planeShader = ShaderLoader::instance()->load<MVPShader>("plane.glsl");
 
+
     //initialize spheres with some random values
     std::vector<CUDA::Sphere> spheres(sphereCount);
     for(CUDA::Sphere& p : spheres){
-        p.position = glm::ballRand(5.0f) + vec3(0, 10, 0);
+        p.position = glm::ballRand(5.0f);
         p.radius = 0.5f;
         p.color = glm::linearRand(vec4(0,0,0,1),vec4(1,1,1,1));
-        p.impulse = vec3(0, -1, 0);
+       // p.impulse = vec3(0, -1, 0);
     }
+
+
+/*
+    // TEST
+    std::vector<CUDA::Sphere> spheres(2);
+    spheres[0].position = vec3(0, 10, 0);
+    spheres[0].radius = 0.5f;
+    spheres[0].impulse = vec3(0, -1, 0);
+    spheres[0].color = vec4(1);
+
+    spheres[1].position = vec3(0, 5, 0);
+    spheres[1].radius = 0.5f;
+    spheres[1].impulse = vec3(0, -1, 0);
+    spheres[1].color = vec4(1);
+*/
+
     //upload sphere array to opengl
     sphereBuffer.set(spheres);
     sphereBuffer.setDrawMode(GL_POINTS);

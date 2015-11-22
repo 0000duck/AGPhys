@@ -37,6 +37,22 @@ __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSphere
         }
 
         // TODO: COLLIDE SPHERES
+        for (int s = 0; s < numberOfSpheres; ++s)
+        {
+            if (s == tid) continue; // same sphere
+
+            Sphere& other = spheres[s];
+            IntersectionData currentIntersection = collideSphereSphere(&sphere, &other, dt);
+
+            if (currentIntersection.intersects)
+            {
+                if (!firstIntersection.intersects || currentIntersection.colTime < firstIntersection.colTime)
+                {
+                    firstIntersection = currentIntersection;
+                }
+            }
+
+        }
 
 
         // UPDATE SPHERE
