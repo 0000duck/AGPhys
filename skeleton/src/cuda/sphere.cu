@@ -25,6 +25,7 @@ __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSphere
         for (int p = 0; p < numberOfPlanes; ++p)
         {
             Plane& plane = planes[p];
+
             IntersectionData currentIntersection = collideSpherePlane(&sphere, &plane, dt);
 
             if (currentIntersection.intersects)
