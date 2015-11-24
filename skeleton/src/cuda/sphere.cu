@@ -37,6 +37,8 @@ __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSphere
     {
         Sphere& sphere = spheres[tid];
 
+        sphere.impulse += dt * make_float3(0, -10, 0); // gravity
+
         IntersectionData firstIntersection = make_intersectiondata();
 
         // COLLIDE PLANES
@@ -86,7 +88,6 @@ __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSphere
             sphere.position += dt * sphere.impulse;
         }
 
-        sphere.impulse += dt * make_float3(0, -10, 0); // gravity
     }
 }
 

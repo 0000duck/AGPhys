@@ -70,7 +70,7 @@ __device__ IntersectionData collideSphereSphere(Sphere* sphere1, Sphere *sphere2
     Sphere s1 = *sphere1;
     Sphere s2 = *sphere2;
 
-    float3 relSpeed = s2.impulse / s2.mass - s1.impulse / s1.mass;
+    float3 relSpeed = s1.impulse / s1.mass - s2.impulse / s2.mass;
 
     if (s1.impulse.x == s2.impulse.x && s1.impulse.y == s2.impulse.y && s1.impulse.z == s2.impulse.z)
     {
@@ -115,20 +115,23 @@ __device__ IntersectionData collideSphereSphere(Sphere* sphere1, Sphere *sphere2
 __device__ void resolveCollisionKinematically(Sphere* sphere, IntersectionData* intersection)
 {
     sphere->impulse = reflect(sphere->impulse, intersection->colNormal);
-    sphere->position = intersection->lastValidPos1;
+    sphere->position = intersection->lastValidPos1 + 0.001 * intersection->colNormal;
 }
 
 __device__ void resolveCollisionDynamically(Sphere* sphere, IntersectionData* intersection, float dt)
 {
-    float lamda_spring = 10;
-    float lamda_dashpot = .1;
-    float lamda_shear = .1;
+    //float lamda_spring = 10;
+    float lamda_dashpot = 5;
+    float lamda_shear = -2;
 
-    float3 f_spring = lamda_spring * intersection->penetration * intersection->colNormal;
+    //float3 f_spring = lamda_spring * intersection->penetration * intersection->colNormal;
     float3 f_dashpot = lamda_dashpot * intersection->relSpeed;
     float3 f_shear = lamda_shear * (intersection->relSpeed - dot(intersection->relSpeed, intersection->colNormal) * intersection->colNormal);
 
-    sphere->impulse += f_spring;
-    sphere->position = intersection->lastValidPos1;
+
+    float3 reflectedImpulse = f_dashpot + reflect(sphere->impulse, intersection->colNormal); // dampened
+
+    sphere->impulse = reflectedImpulse;
+    sphere->position = intersection->lastValidPos1 + 0.001 * intersection->colNormal;
 }
 
