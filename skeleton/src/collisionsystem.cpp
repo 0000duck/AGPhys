@@ -1,5 +1,7 @@
 #include "collisionSystem.h"
 #include "saiga/opengl/shader/shaderLoader.h"
+#include <random>
+#include <ctime>
 
 
 CollisionSystem::CollisionSystem()
@@ -13,7 +15,7 @@ CollisionSystem::~CollisionSystem()
 
 void CollisionSystem::init()
 {
-
+    std::srand(std::time(NULL));
     sphereShader = ShaderLoader::instance()->load<MVPShader>("particles.glsl");
 
     //initialize spheres with some random values
@@ -22,15 +24,20 @@ void CollisionSystem::init()
         p.position = glm::ballRand(5.0f) + vec3(0, 5, 0);
         p.radius = 0.5f;
         p.color = glm::linearRand(vec4(0,0,0,1),vec4(1,1,1,1));
-        p.impulse = vec3(20, -1, 0);
+        p.impulse = glm::ballRand(18.0f) * vec3(1, 0.1f, 1);
+        p.mass = rand() * 10;
     }
-
 
     //upload sphere array to opengl
     sphereBuffer.set(spheres);
     sphereBuffer.setDrawMode(GL_POINTS);
 
     sphere_interop.registerGLBuffer(sphereBuffer.getVBO());
+
+    sphere_interop.map();
+    void* spheres_ptr = sphere_interop.getDevicePtr();
+    CUDA::resetSpheres(static_cast<CUDA::Sphere*>(spheres_ptr), sphereCount, 5, 5, -7, 3, -7, 2);
+    sphere_interop.unmap();
 }
 
 void CollisionSystem::update(float dt, CUDA::Plane* planes, int planeCount)
@@ -55,7 +62,14 @@ void CollisionSystem::render(Camera *cam)
 
 void CollisionSystem::keyPressed(int key)
 {
-
+    switch(key){
+        case SDLK_r:
+            sphere_interop.map();
+            void* spheres_ptr = sphere_interop.getDevicePtr();
+            CUDA::resetSpheres(static_cast<CUDA::Sphere*>(spheres_ptr), sphereCount, 10, 10, -7, 0, -7, 1);
+            sphere_interop.unmap();
+            break;
+    }
 }
 
 void CollisionSystem::keyReleased(int key)

@@ -30,7 +30,7 @@ void myRenderer::init()
     g.createBuffers(grid_bottom, 10, 10);
     ps.push_back(CUDA::Plane());
     ps[0].center = vec3(0);
-    ps[0].normal = normalize(vec3(0, 1, 0));
+    ps[0].normal = glm::normalize(vec3(0, 1, 0));
     ps[0].d     = glm::dot(ps[0].center, ps[0].normal);
 
 
@@ -39,7 +39,7 @@ void myRenderer::init()
     g.createBuffers(grid_left, 10, 10);
     ps.push_back(CUDA::Plane());
     ps[1].center = vec3(-9, 9, 0);
-    ps[1].normal = normalize(vec3(1, 0, 0));
+    ps[1].normal = glm::normalize(vec3(1, 0, 0));
     ps[1].d     = glm::dot(ps[1].center, ps[1].normal);
 
     // right
@@ -47,7 +47,7 @@ void myRenderer::init()
     g.createBuffers(grid_right, 10, 10);
     ps.push_back(CUDA::Plane());
     ps[2].center = vec3(9, 9, 0);
-    ps[2].normal = normalize(vec3(-1, 0, 0));
+    ps[2].normal = glm::normalize(vec3(-1, 0, 0));
     ps[2].d     = glm::dot(ps[2].center, ps[2].normal);
 
     // front
@@ -55,7 +55,7 @@ void myRenderer::init()
     g.createBuffers(grid_front, 10, 10);
     ps.push_back(CUDA::Plane());
     ps[3].center = vec3(0, 9, 9);
-    ps[3].normal = normalize(vec3(0, 0, -1));
+    ps[3].normal = glm::normalize(vec3(0, 0, -1));
     ps[3].d     = glm::dot(ps[3].center, ps[3].normal);
 
     // back
@@ -63,7 +63,7 @@ void myRenderer::init()
     g.createBuffers(grid_back, 10, 10);
     ps.push_back(CUDA::Plane());
     ps[4].center = vec3(0, 9, -9);
-    ps[4].normal = normalize(vec3(0, 0, 1));
+    ps[4].normal = glm::normalize(vec3(0, 0, 1));
     ps[4].d     = glm::dot(ps[4].center, ps[4].normal);
 
 

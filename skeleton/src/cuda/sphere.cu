@@ -10,6 +10,24 @@
 
 namespace CUDA {
 
+__global__ void resetSpheresGrid(Sphere* spheres, int numberOfSpheres, int x, int z, float cornerX, float cornerY, float cornerZ, float distance)
+{
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    if (tid < numberOfSpheres)
+    {
+        int layerSize = x * z;
+        int yPos = tid / layerSize;
+        int normId = tid - yPos * layerSize;
+
+        int xPos = normId % x;
+        int zPos = (normId - xPos) / x;
+
+        spheres[tid].position.x = xPos * distance + cornerX;
+        spheres[tid].position.y = yPos * distance + cornerY;
+        spheres[tid].position.z = zPos * distance + cornerZ;
+    }
+}
+
 
 __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes, float dt)
 {
@@ -59,19 +77,25 @@ __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSphere
         // UPDATE SPHERE
         if (firstIntersection.intersects)
         {
-            sphere.impulse += firstIntersection.colTime * make_float3(0, -1, 0);
-            sphere.impulse = 0.75 * reflect(sphere.impulse, firstIntersection.colNormal);
-            sphere.position = firstIntersection.lastValidPos1;
+            //resolveCollisionKinematically(&sphere, &firstIntersection);
+            resolveCollisionDynamically(&sphere, &firstIntersection, dt);
         }
         else
         {
-            sphere.impulse += dt * make_float3(0, -1, 0);
+            // just move
             sphere.position += dt * sphere.impulse;
         }
 
+        sphere.impulse += dt * make_float3(0, -10, 0); // gravity
     }
 }
 
+void resetSpheres(Sphere* spheres, int numberOfSpheres, int x, int z, float cornerX, float cornerY, float cornerZ, float distance)
+{
+    int threadsPerBlock = 128;
+    int blocks = numberOfSpheres / threadsPerBlock + 1;
+    resetSpheresGrid<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, x, z, cornerX, cornerY, cornerZ, distance);
+}
 
 void updateAllSpheres(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes, float dt)
 {
