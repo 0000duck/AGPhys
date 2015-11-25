@@ -37,7 +37,8 @@ __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSphere
     {
         Sphere& sphere = spheres[tid];
 
-        sphere.impulse += dt * make_float3(0, -10, 0); // gravity
+
+        sphere.impulse += dt * make_float3(0.0f, -1.0f, 0.0f); // gravity
 
         IntersectionData firstIntersection = make_intersectiondata();
 
@@ -57,6 +58,7 @@ __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSphere
             }
         }
 
+        int sphereIndex = 0;
         // TODO: COLLIDE SPHERES
         for (int s = 0; s < numberOfSpheres; ++s)
         {
@@ -70,6 +72,7 @@ __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSphere
                 if (!firstIntersection.intersects || currentIntersection.colTime < firstIntersection.colTime)
                 {
                     firstIntersection = currentIntersection;
+                    sphereIndex = s;
                 }
             }
 
@@ -79,14 +82,27 @@ __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSphere
         // UPDATE SPHERE
         if (firstIntersection.intersects)
         {
-            //resolveCollisionKinematically(&sphere, &firstIntersection);
-            resolveCollisionDynamically(&sphere, &firstIntersection, dt);
+            if (firstIntersection.isSphereIntersection)
+            {
+                // only update if lower index
+                if (sphereIndex > tid)
+                {
+                    //resolveCollisionKinematically(&sphere, &firstIntersection);
+                    resolveCollisionDynamically(&sphere, &firstIntersection);
+                }
+
+            }
+            else {
+                //sphereresolveCollisionKinematically(&sphere, &firstIntersection);
+                resolveCollisionDynamically(&sphere, &firstIntersection);
+            }
         }
         else
         {
             // just move
             sphere.position += dt * sphere.impulse;
         }
+
 
     }
 }
