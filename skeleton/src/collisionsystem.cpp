@@ -27,6 +27,19 @@ void CollisionSystem::init()
         p.impulse = glm::ballRand(5.0f);
         p.mass = (rand() % 8) + 2;
     }
+    /*
+    spheres[0].position = vec3(-5, 10, 0);
+    spheres[0].radius   = 0.5f;
+    spheres[0].color    = vec4(1);
+    spheres[0].impulse  = vec3(1, 0, 0);
+    spheres[0].mass     = 10;
+
+    spheres[1].position = vec3(5, 10, 0);
+    spheres[1].radius   = 0.5f;
+    spheres[1].color    = vec4(1);
+    spheres[1].impulse  = vec3(-1, 0, 0);
+    spheres[1].mass     = 10;
+    */
 
     //upload sphere array to opengl
     sphereBuffer.set(spheres);

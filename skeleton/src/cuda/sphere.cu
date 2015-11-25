@@ -1,4 +1,4 @@
-#define KINEMATIC
+//#define KINEMATIC
 
 
 #include <cstdlib>
@@ -31,73 +31,91 @@ __global__ void resetSpheresGrid(Sphere* spheres, int numberOfSpheres, int x, in
     }
 }
 
-
-__global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes, float dt)
+__global__ void integrateSpheres(Sphere* spheres, int numberOfSpheres, float dt)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
     if (tid < numberOfSpheres)
     {
-        Sphere& sphere = spheres[tid];
+        Sphere& s = spheres[tid];
 
+        //s.impulse  += dt * make_float3(0, -1, 0); // gravity
+        s.position += dt * s.impulse;
+    }
+}
 
-        //sphere.impulse += dt * make_float3(0.0f, -1.0f, 0.0f); // gravity, use at own risk...
+__global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes, float dt)
+{
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    if (tid < numberOfSpheres)
+    {
+        Sphere& updated = spheres[tid];
+        Sphere prev     = updated;
+        prev.position  -= dt * prev.impulse; // original position
 
         IntersectionData firstIntersection = make_intersectiondata();
 
-        // COLLIDE PLANES
+        // TEST PLANES
         for (int p = 0; p < numberOfPlanes; ++p)
         {
             Plane& plane = planes[p];
 
-            IntersectionData currentIntersection = collideSpherePlane(&sphere, &plane, dt);
-
+            IntersectionData currentIntersection = collideSpherePlane(&prev, &plane, dt); // assumption: plane not moving
             if (currentIntersection.intersects)
             {
                 if (!firstIntersection.intersects || currentIntersection.colTime < firstIntersection.colTime)
                 {
-                    firstIntersection = currentIntersection;
+                        firstIntersection = currentIntersection;
                 }
             }
         }
 
-        int sphereIndex = 0;
-        // TODO: COLLIDE SPHERES
+        // TEST SPHERES
         for (int s = 0; s < numberOfSpheres; ++s)
         {
-            if (s == tid) continue; // same sphere
+            if (s == tid) continue; // self
 
-            Sphere& other = spheres[s];
-            IntersectionData currentIntersection = collideSphereSphere(&sphere, &other, dt);
+            Sphere& other_updated = spheres[s];
+            Sphere other_prev     = other_updated;
+            other_prev.position  -= dt * other_prev.impulse; // other original position
 
+            IntersectionData currentIntersection = collideSphereSphere(&prev, &other_prev, dt);
             if (currentIntersection.intersects)
             {
                 if (!firstIntersection.intersects || currentIntersection.colTime < firstIntersection.colTime)
                 {
-                    firstIntersection = currentIntersection;
-                    sphereIndex = s;
+                        firstIntersection = currentIntersection;
                 }
             }
-
         }
 
 
-        // UPDATE SPHERE
+
+        // RESOLVE COLLISION
         if (firstIntersection.intersects)
         {
 #ifdef KINEMATIC
-            resolveCollisionKinematically(&sphere, &firstIntersection);
+            resolveCollisionKinematically(&updated, &firstIntersection);
 #else
-            resolveCollisionDynamically(&sphere, &firstIntersection);
+            resolveCollisionDynamically(&updated, &firstIntersection);
 #endif
         }
         else
         {
-            // just move
-            sphere.position += dt * sphere.impulse;
+            updated.newPos     = updated.position;
+            updated.newImpulse = updated.impulse;
         }
+    }
+}
 
+__global__ void updateSpheres(Sphere* spheres, int numberOfSpheres)
+{
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    if (tid < numberOfSpheres)
+    {
+        Sphere& sphere = spheres[tid];
 
+        sphere.position = sphere.newPos;
+        sphere.impulse  = sphere.newImpulse;
     }
 }
 
@@ -112,7 +130,9 @@ void updateAllSpheres(Sphere* spheres, Plane* planes, int numberOfSpheres, int n
 {
     int threadsPerBlock = 128;
     int blocks = numberOfSpheres / threadsPerBlock + 1;
-    updateSpheres<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes, dt);
+    integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt); // this way all threads are up to date
+    collideSpheres<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes, dt);
+    updateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres);
 }
 
 
