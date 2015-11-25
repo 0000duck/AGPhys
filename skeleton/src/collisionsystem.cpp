@@ -22,24 +22,12 @@ void CollisionSystem::init()
     std::vector<CUDA::Sphere> spheres(sphereCount);
     for(CUDA::Sphere& p : spheres){
         p.position = glm::ballRand(5.0f) + vec3(0, 5, 0);
-        p.radius = 0.5f;
+        p.radius = 0.1f * (rand() % 2 + 3);
         p.color = glm::linearRand(vec4(0,0,0,1),vec4(1,1,1,1));
         p.impulse = glm::ballRand(5.0f);
         p.mass = (rand() % 8) + 2;
     }
-    /*
-    spheres[0].position = vec3(0, 1, 0);
-    spheres[0].radius = 0.5f;
-    spheres[0].color = vec4(1);
-    spheres[0].impulse = vec3(-4, 0, 0);
-    spheres[0].mass = 50;
 
-    spheres[1].position = vec3(0, 2, 0);
-    spheres[1].radius = 0.5f;
-    spheres[1].color = vec4(1);
-    spheres[1].impulse = vec3(0, 1, 0);
-    spheres[1].mass = 5;
-*/
     //upload sphere array to opengl
     sphereBuffer.set(spheres);
     sphereBuffer.setDrawMode(GL_POINTS);
@@ -48,7 +36,7 @@ void CollisionSystem::init()
 
     sphere_interop.map();
     void* spheres_ptr = sphere_interop.getDevicePtr();
-    CUDA::resetSpheres(static_cast<CUDA::Sphere*>(spheres_ptr), sphereCount, 5, 5, -7, 3, -7, 2);
+    CUDA::resetSpheres(static_cast<CUDA::Sphere*>(spheres_ptr), sphereCount, 9, 9, -8, 1, -8, 2);
     sphere_interop.unmap();
 }
 

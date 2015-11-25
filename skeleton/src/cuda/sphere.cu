@@ -1,3 +1,6 @@
+#define KINEMATIC
+
+
 #include <cstdlib>
 #include <cuda_runtime.h>
 #include <iostream>
@@ -38,7 +41,7 @@ __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSphere
         Sphere& sphere = spheres[tid];
 
 
-        sphere.impulse += dt * make_float3(0.0f, -1.0f, 0.0f); // gravity
+        //sphere.impulse += dt * make_float3(0.0f, -1.0f, 0.0f); // gravity, use at own risk...
 
         IntersectionData firstIntersection = make_intersectiondata();
 
@@ -82,20 +85,11 @@ __global__ void updateSpheres(Sphere* spheres, Plane* planes, int numberOfSphere
         // UPDATE SPHERE
         if (firstIntersection.intersects)
         {
-            if (firstIntersection.isSphereIntersection)
-            {
-                // only update if lower index
-                if (sphereIndex > tid)
-                {
-                    //resolveCollisionKinematically(&sphere, &firstIntersection);
-                    resolveCollisionDynamically(&sphere, &firstIntersection);
-                }
-
-            }
-            else {
-                //sphereresolveCollisionKinematically(&sphere, &firstIntersection);
-                resolveCollisionDynamically(&sphere, &firstIntersection);
-            }
+#ifdef KINEMATIC
+            resolveCollisionKinematically(&sphere, &firstIntersection);
+#else
+            resolveCollisionDynamically(&sphere, &firstIntersection);
+#endif
         }
         else
         {
@@ -123,4 +117,3 @@ void updateAllSpheres(Sphere* spheres, Plane* planes, int numberOfSpheres, int n
 
 
 }
-

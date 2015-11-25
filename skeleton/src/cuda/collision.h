@@ -196,4 +196,3 @@ __device__ inline void resolveCollisionDynamically(Sphere* sphere, IntersectionD
         resolveCollisionSpherePlane(sphere, intersection->plane, intersection);
     }
 }
-

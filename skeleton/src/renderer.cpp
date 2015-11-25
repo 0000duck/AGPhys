@@ -33,7 +33,6 @@ void myRenderer::init()
     ps[0].normal = glm::normalize(vec3(0, 1, 0));
     ps[0].d     = glm::dot(ps[0].center, ps[0].normal);
 
-
     // left
     g = Grid(vec3(-9, 9, 0), vec3(0,0,1), vec3(0,1,0));
     g.createBuffers(grid_left, 10, 10);
@@ -65,6 +64,14 @@ void myRenderer::init()
     ps[4].center = vec3(0, 9, -9);
     ps[4].normal = glm::normalize(vec3(0, 0, 1));
     ps[4].d     = glm::dot(ps[4].center, ps[4].normal);
+
+    // top
+    g = Grid(vec3(0, 18, 0), vec3(1,0,0), vec3(0,0,1));
+    g.createBuffers(grid_top, 10, 10);
+    ps.push_back(CUDA::Plane());
+    ps[5].center = vec3(0, 18, 0);
+    ps[5].normal = glm::normalize(vec3(0, -1, 0));
+    ps[5].d     = glm::dot(ps[5].center, ps[5].normal);
 
 
     planeCount = ps.size();
@@ -103,6 +110,7 @@ void myRenderer::render(Camera *cam)
     grid_right.bindAndDraw();
     grid_front.bindAndDraw();
     grid_back.bindAndDraw();
+    grid_top.bindAndDraw();
     gridShader->unbind();
 
 
