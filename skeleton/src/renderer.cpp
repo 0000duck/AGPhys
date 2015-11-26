@@ -113,9 +113,13 @@ void myRenderer::render(Camera *cam)
     grid_top.bindAndDraw();
     gridShader->unbind();
 
+    static int i = 0;
+    std::cout << i++ << std::endl;
 
     //particleSystem.render(cam);
     collisionSystem.render(cam);
+
+
 }
 
 

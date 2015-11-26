@@ -4,6 +4,15 @@
 #include <ctime>
 
 
+#define checked_cuda(ans) { gpu_assert((ans), __FILE__, __LINE__); }
+inline void gpu_assert(cudaError_t code, char *file, int line, bool abort=true) {
+    if (code != cudaSuccess) {
+        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        if (abort) exit(code);
+    }
+}
+
+
 CollisionSystem::CollisionSystem()
 {
 
@@ -27,19 +36,6 @@ void CollisionSystem::init()
         p.impulse = glm::ballRand(5.0f);
         p.mass = (rand() % 8) + 2;
     }
-    /*
-    spheres[0].position = vec3(-5, 10, 0);
-    spheres[0].radius   = 0.5f;
-    spheres[0].color    = vec4(1);
-    spheres[0].impulse  = vec3(1, 0, 0);
-    spheres[0].mass     = 10;
-
-    spheres[1].position = vec3(5, 10, 0);
-    spheres[1].radius   = 0.5f;
-    spheres[1].color    = vec4(1);
-    spheres[1].impulse  = vec3(-1, 0, 0);
-    spheres[1].mass     = 10;
-    */
 
     //upload sphere array to opengl
     sphereBuffer.set(spheres);
@@ -62,6 +58,8 @@ void CollisionSystem::update(float dt, CUDA::Plane* planes, int planeCount)
     CUDA::updateAllSpheres(static_cast<CUDA::Sphere*>(spheres), static_cast<CUDA::Plane*>(planes), sphereCount, planeCount, dt);
 
     sphere_interop.unmap();
+
+
 }
 
 void CollisionSystem::render(Camera *cam)

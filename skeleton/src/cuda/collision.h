@@ -78,8 +78,7 @@ __device__ IntersectionData collideSpherePlane(Sphere* sphere, Plane* plane, flo
     }
 
     float3 colNormal = normalize(plane->normal);
-    float denom = (dot(plane->normal, sphere->position) - dot(plane->normal, updated.position));
-    float colTime = dt * ((dot(plane->normal, sphere->position) - plane->d - sphere->radius * length(plane->normal)) / denom);
+    float colTime = dt * ((dot(plane->normal, sphere->position) - plane->d - sphere->radius * length(plane->normal)) / (dot(plane->normal, sphere->position) - dot(plane->normal, updated.position)));
     float3 lastValidPos = sphere->position + sphere->impulse * colTime;
 
     return make_intersectiondata(intersects, colNormal, colTime, lastValidPos, plane->center, plane);
@@ -120,7 +119,7 @@ __device__ IntersectionData collideSphereSphere(Sphere* sphere1, Sphere *sphere2
     }
 
     float3 lastValidPos1 = sphere1->position + sphere1->impulse * colTime;
-    float3 lastValidPos2 = sphere2->position + sphere2->impulse * colTime;
+    float3 lastValidPos2 = sphere2->position + sphere2->impulse * colTime; // since this is called with other_prev (see sphere.cu), this should work
     float3 colNormal = normalize(lastValidPos1 - lastValidPos2);
 
     return make_intersectiondata(true, colNormal, colTime, lastValidPos1, lastValidPos2, sphere2);
@@ -128,11 +127,9 @@ __device__ IntersectionData collideSphereSphere(Sphere* sphere1, Sphere *sphere2
 
 __device__ void resolveCollisionKinematically(Sphere* sphere, IntersectionData* intersection)
 {
-    //sphere->impulse = reflect(sphere->impulse, intersection->colNormal);
-    //sphere->position = intersection->lastValidPos1;
+    sphere->newImpulse  = 0.9 * reflect(sphere->impulse, intersection->colNormal);
 
-    sphere->newImpulse  = reflect(sphere->impulse, intersection->colNormal);
-    sphere->newPos      = intersection->lastValidPos1;
+    //sphere->newPos      = intersection->lastValidPos1;
 }
 
 __device__ void resolveCollisionSphereSphere(Sphere* sphere1, Sphere* sphere2, IntersectionData* intersection)
@@ -163,12 +160,7 @@ __device__ void resolveCollisionSphereSphere(Sphere* sphere1, Sphere* sphere2, I
     float3 newImpulse1 = v1_tang + w1_normal;
     float3 newImpulse2 = v2_tang + w2_normal;
 
-    //sphere1->position = intersection->lastValidPos1;
-    //sphere2->position = intersection->lastValidPos2;
-    //sphere1->impulse = newImpulse1;
-    //sphere2->impulse = newImpulse2;
-
-    sphere1->newPos = intersection->lastValidPos1;
+    //sphere1->newPos = intersection->lastValidPos1;
     sphere1->newImpulse = newImpulse1;
 }
 
@@ -182,10 +174,8 @@ __device__ void resolveCollisionSpherePlane(Sphere* sphere, Plane* plane, Inters
 
     float3 newImpulse = (1 - lamda_shear) * v_tang - (1 - lamda_dashpot) * v_normal;
 
-    //sphere->position = intersection->lastValidPos1;
-    //sphere->impulse = newImpulse;
 
-    sphere->newPos  = intersection->lastValidPos1;
+    //sphere->newPos  = intersection->lastValidPos1;
     sphere->newImpulse = newImpulse;
 }
 

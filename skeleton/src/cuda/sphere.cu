@@ -1,5 +1,5 @@
-//#define KINEMATIC
-
+#define KINEMATIC
+#define GRAVITY
 
 #include <cstdlib>
 #include <cuda_runtime.h>
@@ -31,6 +31,15 @@ __global__ void resetSpheresGrid(Sphere* spheres, int numberOfSpheres, int x, in
     }
 }
 
+__global__ void setImpulse(Sphere* spheres, int numberOfSpheres)
+{
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    if (tid < numberOfSpheres)
+    {
+        spheres[tid].impulse = make_float3(1, 1, 1);
+    }
+}
+
 __global__ void integrateSpheres(Sphere* spheres, int numberOfSpheres, float dt)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -38,9 +47,15 @@ __global__ void integrateSpheres(Sphere* spheres, int numberOfSpheres, float dt)
     {
         Sphere& s = spheres[tid];
 
-        //s.impulse  += dt * make_float3(0, -1, 0); // gravity
+#ifdef GRAVITY
+        s.impulse  += dt * make_float3(0, -1, 0); // gravity, breaks everything......
+#endif
         s.position += dt * s.impulse;
+
+        // DEBUG
+        s.color = make_float4(s.impulse) / 5 + make_float4(1, 1, 1, 0);
     }
+
 }
 
 __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes, float dt)
@@ -64,7 +79,7 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
             {
                 if (!firstIntersection.intersects || currentIntersection.colTime < firstIntersection.colTime)
                 {
-                        firstIntersection = currentIntersection;
+                    firstIntersection = currentIntersection;
                 }
             }
         }
@@ -83,7 +98,7 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
             {
                 if (!firstIntersection.intersects || currentIntersection.colTime < firstIntersection.colTime)
                 {
-                        firstIntersection = currentIntersection;
+                    firstIntersection = currentIntersection;
                 }
             }
         }
@@ -98,6 +113,7 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
 #else
             resolveCollisionDynamically(&updated, &firstIntersection);
 #endif
+
         }
         else
         {
