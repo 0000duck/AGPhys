@@ -1,4 +1,4 @@
-#define KINEMATIC
+//#define KINEMATIC
 #define GRAVITY
 
 #include <cstdlib>
@@ -31,15 +31,6 @@ __global__ void resetSpheresGrid(Sphere* spheres, int numberOfSpheres, int x, in
     }
 }
 
-__global__ void setImpulse(Sphere* spheres, int numberOfSpheres)
-{
-    int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    if (tid < numberOfSpheres)
-    {
-        spheres[tid].impulse = make_float3(1, 1, 1);
-    }
-}
-
 __global__ void integrateSpheres(Sphere* spheres, int numberOfSpheres, float dt)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -50,7 +41,7 @@ __global__ void integrateSpheres(Sphere* spheres, int numberOfSpheres, float dt)
 #ifdef GRAVITY
         s.impulse  += dt * make_float3(0, -1, 0); // gravity, breaks everything......
 #endif
-        s.position += dt * s.impulse;
+        s.newPos    = s.position + dt * s.impulse;
 
         // DEBUG
         s.color = make_float4(s.impulse) / 5 + make_float4(1, 1, 1, 0);
@@ -63,9 +54,7 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < numberOfSpheres)
     {
-        Sphere& updated = spheres[tid];
-        Sphere prev     = updated;
-        prev.position  -= dt * prev.impulse; // original position
+        Sphere& sphere = spheres[tid];
 
         IntersectionData firstIntersection = make_intersectiondata();
 
@@ -74,7 +63,7 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
         {
             Plane& plane = planes[p];
 
-            IntersectionData currentIntersection = collideSpherePlane(&prev, &plane, dt); // assumption: plane not moving
+            IntersectionData currentIntersection = collideSpherePlane(&sphere, &plane, dt); // assumption: plane not moving
             if (currentIntersection.intersects)
             {
                 if (!firstIntersection.intersects || currentIntersection.colTime < firstIntersection.colTime)
@@ -89,11 +78,9 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
         {
             if (s == tid) continue; // self
 
-            Sphere& other_updated = spheres[s];
-            Sphere other_prev     = other_updated;
-            other_prev.position  -= dt * other_prev.impulse; // other original position
+            Sphere& other = spheres[s];
 
-            IntersectionData currentIntersection = collideSphereSphere(&prev, &other_prev, dt);
+            IntersectionData currentIntersection = collideSphereSphere(&sphere, &other, dt);
             if (currentIntersection.intersects)
             {
                 if (!firstIntersection.intersects || currentIntersection.colTime < firstIntersection.colTime)
@@ -109,17 +96,14 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
         if (firstIntersection.intersects)
         {
 #ifdef KINEMATIC
-            resolveCollisionKinematically(&updated, &firstIntersection);
+            resolveCollisionKinematically(&sphere, &firstIntersection);
 #else
-            resolveCollisionDynamically(&updated, &firstIntersection);
+            resolveCollisionDynamically(&sphere, &firstIntersection);
 #endif
 
         }
-        else
-        {
-            updated.newPos     = updated.position;
-            updated.newImpulse = updated.impulse;
-        }
+        sphere.position = sphere.newPos;
+
     }
 }
 
@@ -131,7 +115,6 @@ __global__ void updateSpheres(Sphere* spheres, int numberOfSpheres)
         Sphere& sphere = spheres[tid];
 
         sphere.position = sphere.newPos;
-        sphere.impulse  = sphere.newImpulse;
     }
 }
 

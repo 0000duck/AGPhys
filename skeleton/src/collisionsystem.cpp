@@ -29,6 +29,7 @@ void CollisionSystem::init()
 
     //initialize spheres with some random values
     std::vector<CUDA::Sphere> spheres(sphereCount);
+
     for(CUDA::Sphere& p : spheres){
         p.position = glm::ballRand(5.0f) + vec3(0, 5, 0);
         p.radius = 0.1f * (rand() % 2 + 3);
@@ -37,6 +38,17 @@ void CollisionSystem::init()
         p.mass = (rand() % 8) + 2;
     }
 
+    /*
+    spheres[0].position = vec3(0, 1.6f, 0);
+    spheres[0].radius = 0.5f;
+    spheres[0].impulse = vec3(0);
+    spheres[0].mass = 50;
+
+    spheres[1].position = vec3(0, 0.5f, 0);
+    spheres[1].radius = 0.5f;
+    spheres[1].impulse = vec3(0);
+    spheres[1].mass = 50;
+    */
     //upload sphere array to opengl
     sphereBuffer.set(spheres);
     sphereBuffer.setDrawMode(GL_POINTS);
