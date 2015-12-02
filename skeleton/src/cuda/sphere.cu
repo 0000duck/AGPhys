@@ -1,4 +1,4 @@
-//#define KINEMATIC
+#define KINEMATIC
 #define GRAVITY
 
 #include <cstdlib>
@@ -41,10 +41,10 @@ __global__ void integrateSpheres(Sphere* spheres, int numberOfSpheres, float dt)
 #ifdef GRAVITY
         s.impulse  += dt * make_float3(0, -1, 0); // gravity, breaks everything......
 #endif
-        s.newPos    = s.position + dt * s.impulse;
+        s.position += dt * s.impulse;
 
         // DEBUG
-        s.color = make_float4(s.impulse) / 5 + make_float4(1, 1, 1, 0);
+        //s.color = make_float4(s.impulse) / 5 + make_float4(1, 1, 1, 0);
     }
 
 }
@@ -55,66 +55,53 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
     if (tid < numberOfSpheres)
     {
         Sphere& sphere = spheres[tid];
+        sphere.color = make_float4(1,0,0,1);
+        sphere.newImpulse = sphere.impulse;
 
-        IntersectionData firstIntersection = make_intersectiondata();
 
-        // TEST PLANES
         for (int p = 0; p < numberOfPlanes; ++p)
         {
             Plane& plane = planes[p];
-
-            IntersectionData currentIntersection = collideSpherePlane(&sphere, &plane, dt); // assumption: plane not moving
-            if (currentIntersection.intersects)
+            float penetration = collideSpherePlane(sphere, plane);
+            if (penetration != -1.0f)
             {
-                if (!firstIntersection.intersects || currentIntersection.colTime < firstIntersection.colTime)
-                {
-                    firstIntersection = currentIntersection;
-                }
+                sphere.color = make_float4(1);
+
+#ifdef KINEMATIC
+                kinematicCollisionResponseSpherePlane(sphere, plane, penetration);
+#else
+                dynamicCollisionResponseSpherePlane(sphere, plane, penetration, dt);
+#endif
             }
         }
 
-        // TEST SPHERES
+
         for (int s = 0; s < numberOfSpheres; ++s)
         {
-            if (s == tid) continue; // self
-
+            if (s == tid) continue;
             Sphere& other = spheres[s];
-
-            IntersectionData currentIntersection = collideSphereSphere(&sphere, &other, dt);
-            if (currentIntersection.intersects)
+            float penetration = collideSphereSphere(sphere, other);
+            if (penetration != -1.0f)
             {
-                if (!firstIntersection.intersects || currentIntersection.colTime < firstIntersection.colTime)
-                {
-                    firstIntersection = currentIntersection;
-                }
+                sphere.color = make_float4(1);
+#ifdef KINEMATIC
+                kinematicCollisionResponseSphereSphere(sphere, other, penetration);
+#else
+                dynamicCollisionResponseSphereSphere(sphere, other, penetration, dt);
+#endif
             }
         }
-
-
-
-        // RESOLVE COLLISION
-        if (firstIntersection.intersects)
-        {
-#ifdef KINEMATIC
-            resolveCollisionKinematically(&sphere, &firstIntersection);
-#else
-            resolveCollisionDynamically(&sphere, &firstIntersection);
-#endif
-
-        }
-        sphere.position = sphere.newPos;
 
     }
 }
 
-__global__ void updateSpheres(Sphere* spheres, int numberOfSpheres)
+__global__ void updateImpulses(Sphere* spheres, int numberOfSpheres)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < numberOfSpheres)
     {
         Sphere& sphere = spheres[tid];
-
-        sphere.position = sphere.newPos;
+        sphere.impulse = sphere.newImpulse;
     }
 }
 
@@ -131,8 +118,6 @@ void updateAllSpheres(Sphere* spheres, Plane* planes, int numberOfSpheres, int n
     int blocks = numberOfSpheres / threadsPerBlock + 1;
     integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt); // this way all threads are up to date
     collideSpheres<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes, dt);
-    updateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres);
+    updateImpulses<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres);
 }
-
-
 }

@@ -13,7 +13,7 @@ class CollisionSystem : public SDL_KeyListener
 {
 public:
 
-    int sphereCount = 200;
+    int sphereCount = 20;
 
     VertexBuffer<CUDA::Sphere> sphereBuffer;
 

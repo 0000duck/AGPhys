@@ -15,7 +15,7 @@ public:
     vec3_t impulse;
     float mass;
 
-    vec3_t newPos;
+    vec3_t newImpulse;
 
     Sphere(){}
 

@@ -7,216 +7,149 @@
 
 using namespace CUDA;
 
-#ifdef __CUDACC__
 
-class __align__(4) IntersectionData
+/// ------------------------------------------------------ COLLISION DETECTION ------------------------------------------------------
+
+/*
+ * returns by how much the sphere intersects the plane and -1 if no collision
+ */
+__device__ float collideSpherePlane(Sphere& sphere, Plane& plane)
 {
-public:
-    float3 colNormal;
-    float colTime;
-    float3 lastValidPos;
-    Sphere* sphere;
-    Plane* plane;
-
-    bool isSphereIntersection; // true = sphere, false = plane
-
-    bool intersects;
-
-}__attribute__((packed));
-
-#endif
-
-__device__ inline IntersectionData make_intersectiondata(bool intersects, float3 colNormal, float colTime, float3 lastValidPos, Sphere* sphere)
-{
-    IntersectionData i;
-    i.intersects = intersects;
-    i.colNormal = colNormal;
-    i.colTime = colTime;
-    i.lastValidPos = lastValidPos;
-    i.sphere = sphere;
-    i.isSphereIntersection = true;
-    return i;
+    if (dot(sphere.impulse, plane.normal) > 0)
+    {
+        // moving away from plane
+        return -1.0f;
+    }
+    if (dot(plane.normal, sphere.position) <= plane.d + sphere.radius * length(plane.normal))
+    {
+        // intersects
+        float penetration = dot(plane.normal, sphere.position) - plane.d - sphere.radius;
+        return abs(penetration);
+    }
+    return -1.0f;
 }
 
-__device__ inline IntersectionData make_intersectiondata(bool intersects, float3 colNormal, float colTime, float3 lastValidPos, Plane* plane)
+/*
+ * returns by how much the spheres intersects each other and -1 if no collision
+ */
+__device__ float collideSphereSphere(Sphere& sphere1, Sphere& sphere2)
 {
-    IntersectionData i;
-    i.intersects = intersects;
-    i.colNormal = colNormal;
-    i.colTime = colTime;
-    i.lastValidPos = lastValidPos;
-    i.plane = plane;
-    i.isSphereIntersection = false;
-    return i;
-}
-
-__device__ inline IntersectionData make_intersectiondata(bool intersects)
-{
-    IntersectionData i;
-    i.intersects = intersects;
-    return i;
-}
-
-__device__ inline IntersectionData make_intersectiondata()
-{
-    return make_intersectiondata(false);
-}
-
-
-
-/// ---------------------- COLLISION DETECTION ----------------------
-
-__device__ IntersectionData collideSpherePlane(Sphere* sphere, Plane* plane, float dt)
-{
-    bool intersects = dot(plane->normal, sphere->newPos) <= plane->d + sphere->radius * length(plane->normal);
-    if (!intersects)
+    if (length(sphere1.position - sphere2.position) <= sphere1.radius + sphere2.radius)
     {
-        // return empty
-        return make_intersectiondata();
+        float penetration = sphere1.radius + sphere2.radius - length(sphere1.position - sphere2.position);
+
+        if (length(sphere1.impulse - sphere2.impulse) < 0.001f)
+        {
+            return abs(penetration);
+        }
+
+        float3 colNormal = normalize(sphere2.position - sphere1.position);
+        float s1_vAlongNormal = dot(sphere1.impulse, colNormal);
+        float s2_vAlongNormal = dot(sphere2.impulse, -colNormal);
+
+        if (s1_vAlongNormal >= 0.0f && s2_vAlongNormal >= 0.0f)
+        {
+            // both move towards collision point
+            return abs(penetration);
+        }
+
+        if (s1_vAlongNormal < 0.0f)
+        {
+            // sphere1 moves away from collision point
+            if (s2_vAlongNormal > abs(s1_vAlongNormal))
+            {
+                // s2 catches up
+                return abs(penetration);
+            }
+            else {
+                return -1.0f;
+            }
+        }
+        if (s2_vAlongNormal < 0.0f)
+        {
+            // same for s2
+            if (s1_vAlongNormal > abs(s2_vAlongNormal))
+            {
+                // s2 catches up
+                return abs(penetration);
+            }
+            else {
+                return -1.0f;
+            }
+        }
+
+
+        return abs(penetration);
     }
-
-    float3 colNormal = normalize(plane->normal);
-    float colTime = dt * ((dot(plane->normal, sphere->position) - plane->d - sphere->radius * length(plane->normal)) / (dot(plane->normal, sphere->position) - dot(plane->normal, sphere->newPos)));
-    float3 lastValidPos = sphere->position + sphere->impulse * colTime;
-
-    return make_intersectiondata(intersects, colNormal, colTime, lastValidPos, plane);
-}
-
-__device__ float computeCollisionTime(Sphere* sphere1, Sphere* sphere2, float dt)
-{
-    // assumption: spheres collide after update
-    Sphere s1 = *sphere1;
-    Sphere s2 = *sphere2;
-
-    s1.impulse -= s2.impulse;
-    s2.radius += s1.radius;
-    s1.radius = 0;
-    s2.impulse = make_float3(0);
-
-    float colTime = (dot(s1.impulse, (s2.position - s1.position))
-                     - sqrt(pow(dot(s1.impulse, (s1.position - s2.position)), 2) - dot(s1.impulse, s1.impulse) * (dot(s1.position - s2.position, s1.position - s2.position) - s2.radius)))
-                     / dot(s1.impulse, s1.impulse);
-
-    return colTime;
-}
-
-__device__ IntersectionData collideSphereSphere(Sphere* sphere1, Sphere *sphere2, float dt)
-{
-    bool colBeforeUpdate = length(sphere1->position - sphere2->position) <= sphere1->radius + sphere2->radius;
-    bool colAfterUpdate = length(sphere1->newPos - sphere2->newPos) <= sphere1->radius + sphere2->radius;
-
-    // NO INTERSECTION
-    if (!colBeforeUpdate && !colAfterUpdate)
-    {
-        return make_intersectiondata();
-    }
-
-    // ONLY BEFORE UPDATE
-    if (colBeforeUpdate && !colAfterUpdate)
-    {
-        return make_intersectiondata();
-    }
-
-    // ONLY AFTER UPDATE
-    if (!colBeforeUpdate && colAfterUpdate)
-    {
-        float colTime = computeCollisionTime(sphere1, sphere2, dt);
-        float3 lastValidPos1 = sphere1->position + sphere1->impulse * colTime * 0.99f;
-        float3 lastValidPos2 = sphere2->position + sphere2->impulse * colTime * 0.99f;
-        float3 colNormal = normalize(lastValidPos1 - lastValidPos2);
-
-        return make_intersectiondata(true, colNormal, colTime, lastValidPos1, sphere2);
-    }
-
-    // BOTH BEFORE AND AFTER UPDATE
-
-    float distanceBeforeUpdate = length(sphere1->position - sphere2->position);
-    float distanceAfterUpdate = length(sphere1->newPos - sphere2->newPos);
-
-    // depart
-    if (distanceAfterUpdate > distanceBeforeUpdate)
-    {
-        return make_intersectiondata();
-    }
-    // approach
-    else if (distanceAfterUpdate < distanceBeforeUpdate)
-    {
-        float3 colNormal = normalize(sphere1->position - sphere2->position);
-        return make_intersectiondata(true, colNormal, 0, sphere1->position, sphere2);
-    }
-    // same impulse
-    else
-    {
-        return make_intersectiondata();
-    }
-
+    return -1.0f;
 }
 
 
 
-/// ---------------------- COLLISION RESOLUTION ----------------------
 
-__device__ void resolveCollisionKinematically(Sphere* sphere, IntersectionData* intersection)
+/// ------------------------------------------------------ COLLISION RESPONSE  ------------------------------------------------------
+
+/*
+ *
+ */
+__device__ void kinematicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane, float penetration)
 {
-    sphere->impulse  = 0.9 * reflect(sphere->impulse, intersection->colNormal);
-    sphere->newPos      = intersection->lastValidPos;
+    float3 colNormal = plane.normal;
+    sphere.newImpulse = 0.9 * reflect(sphere.impulse, colNormal);
+    sphere.position += colNormal * penetration;
 }
 
-__device__ void resolveCollisionSphereSphere(Sphere* sphere1, Sphere* sphere2, IntersectionData* intersection)
+__device__ void kinematicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sphere2, float penetration)
 {
-    float3 v1 = sphere1->impulse;
-    float3 v2 = sphere2->impulse;
-    float  m1 = sphere1->mass;
-    float  m2 = sphere2->mass;
+    float3 colNormal = normalize(sphere2.position - sphere1.position);
+    sphere1.newImpulse = 0.9 * reflect(sphere1.impulse, colNormal);
+    sphere1.position += colNormal * 0.5 * penetration;
 
-    float3 v1_normal = dot(v1, intersection->colNormal) / dot(intersection->colNormal, intersection->colNormal) * intersection->colNormal;
-    float3 v1_tang   = v1 - v1_normal;
-
-    float3 v2_normal = dot(v2, intersection->colNormal) / dot(intersection->colNormal, intersection->colNormal) * intersection->colNormal;
-    float3 v2_tang   = v2 - v2_normal;
-
-    float3 w1_normal, w2_normal;
-    if (m1 == m2)
-    {
-        w1_normal = v2_normal;
-        w2_normal = v1_normal;
-    }
-    else
-    {
-        w1_normal = (m1 - m2) / (m1 + m2) * v1_normal + (2 * m2) / (m1 + m2) * v2_normal;
-        w2_normal = (2 * m1) / (m1 + m2) * v1_normal + (m2 - m1) / (m1 + m2) * v2_normal;
-    }
-
-    float3 newImpulse1 = v1_tang + w1_normal;
-    float3 newImpulse2 = v2_tang + w2_normal;
-
-    sphere1->newPos = intersection->lastValidPos;
-    sphere1->impulse = newImpulse1;
+    //sphere2.newImpulse = 0.9 * reflect(sphere2.impulse, -colNormal);
+    //sphere2.position -= colNormal * 0.5 * penetration;
 }
 
-__device__ void resolveCollisionSpherePlane(Sphere* sphere, Plane* plane, IntersectionData* intersection)
+__device__ void dynamicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane, float penetration, float dt)
 {
-    float3 v_normal = dot(sphere->impulse, plane->normal) / dot(plane->normal, plane->normal) * plane->normal;
-    float3 v_tang   = sphere->impulse - v_normal;
+    float3 colNormal = plane.normal;
+    float3 vRel      = dot(sphere.impulse, plane.normal) * plane.normal;
 
-    float lamda_shear = 0.2;
-    float lamda_dashpot = 0.1;
+    float lamda_spring  = 1;
+    float lamda_dashpot = 0.3;
+    float lamda_shear   = 0.3;
 
-    float3 newImpulse = (1 - lamda_shear) * v_tang - (1 - lamda_dashpot) * v_normal;
+    float3 f_spring  = lamda_spring * reflect(sphere.impulse, colNormal);
+    float3 f_dashpot = lamda_dashpot * vRel * sphere.mass;
+    float3 f_shear   = lamda_shear * -1.0f * (sphere.impulse - vRel) * sphere.mass;
 
-
-    sphere->newPos  = intersection->lastValidPos;
-    sphere->impulse = newImpulse;
+    sphere.newImpulse = (f_spring + f_dashpot + f_shear);
+    sphere.position  += colNormal * penetration;
 }
 
-__device__ inline void resolveCollisionDynamically(Sphere* sphere, IntersectionData* intersection)
+__device__ void dynamicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sphere2, float penetration, float dt)
 {
-    if (intersection->isSphereIntersection)
-    {
-        resolveCollisionSphereSphere(sphere, intersection->sphere, intersection);
-    }
-    else
-    {
-        resolveCollisionSpherePlane(sphere, intersection->plane, intersection);
-    }
+    float3 colNormal = normalize(sphere2.position - sphere1.position);
+    float3 vRel      = (dot(sphere1.impulse, colNormal) * colNormal) - (dot(sphere2.impulse, colNormal) * colNormal);
+
+    float lamda_spring  = 1;
+    float lamda_dashpot = 0;
+    float lamda_shear   = 0.3;
+
+    float3 f_spring  = lamda_spring * reflect(sphere1.impulse, colNormal);
+    float3 f_dashpot = lamda_dashpot * vRel * sphere1.mass;
+    float3 f_shear   = make_float3(0);
+
+    sphere1.newImpulse = (f_spring + f_dashpot + f_shear);
+    sphere1.position  += colNormal * penetration * 0.5;
 }
+
+
+
+
+
+
+
+
+
+
+
