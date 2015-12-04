@@ -55,7 +55,7 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
     if (tid < numberOfSpheres)
     {
         Sphere& sphere = spheres[tid];
-        sphere.color = make_float4(1,0,0,1);
+        //sphere.color = make_float4(1,0,0,1);
         sphere.newImpulse = sphere.impulse;
 
 
@@ -65,7 +65,7 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
             float penetration = collideSpherePlane(sphere, plane);
             if (penetration != -1.0f)
             {
-                sphere.color = make_float4(1);
+                //sphere.color = make_float4(1);
 
 #ifdef KINEMATIC
                 kinematicCollisionResponseSpherePlane(sphere, plane, penetration);
@@ -76,20 +76,34 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
         }
 
 
-        for (int s = 0; s < numberOfSpheres; ++s)
+        Sphere* collider = NULL;
+        float max = -1.0f;
+        for (int s = 0; s < tid; ++s)
         {
             if (s == tid) continue;
             Sphere& other = spheres[s];
             float penetration = collideSphereSphere(sphere, other);
             if (penetration != -1.0f)
             {
-                sphere.color = make_float4(1);
-#ifdef KINEMATIC
-                kinematicCollisionResponseSphereSphere(sphere, other, penetration);
-#else
-                dynamicCollisionResponseSphereSphere(sphere, other, penetration, dt);
-#endif
+                //sphere.color = make_float4(1);
+                //elasticCollision(sphere, other);
+                if (penetration > max)
+                {
+                    collider = &other;
+                    max = penetration;
+                }
             }
+        }
+
+        if (max > -1.0f)
+        {
+
+#ifdef KINEMATIC
+                elasticCollision(sphere, *collider);
+#else
+                dynamicCollisionResponseSphereSphere(sphere, *collider, max, dt);
+#endif
+
         }
 
     }
@@ -102,6 +116,7 @@ __global__ void updateImpulses(Sphere* spheres, int numberOfSpheres)
     {
         Sphere& sphere = spheres[tid];
         sphere.impulse = sphere.newImpulse;
+        //sphere.position = sphere.newPosition;
     }
 }
 
@@ -118,6 +133,6 @@ void updateAllSpheres(Sphere* spheres, Plane* planes, int numberOfSpheres, int n
     int blocks = numberOfSpheres / threadsPerBlock + 1;
     integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt); // this way all threads are up to date
     collideSpheres<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes, dt);
-    updateImpulses<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres);
+    //updateImpulses<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres);
 }
 }

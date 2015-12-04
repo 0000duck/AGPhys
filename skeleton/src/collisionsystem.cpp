@@ -41,14 +41,14 @@ void CollisionSystem::init()
     }
 
 /*
-    spheres[0].position = vec3(7, 5, 0);
+    spheres[0].position = vec3(0, 5, 0);
     spheres[0].radius = 0.5f;
-    spheres[0].impulse = vec3(-1, 0, 0);
+    spheres[0].impulse = vec3(0, 0, 0);
     spheres[0].mass = 1;
 
-    spheres[1].position = vec3(-7, 5, 0);
+    spheres[1].position = vec3(0, 1.5, 0);
     spheres[1].radius = 0.5f;
-    spheres[1].impulse = vec3(1, 0, 0);
+    spheres[1].impulse = vec3(0, 0, 0);
     spheres[1].mass = 1;
 */
     //upload sphere array to opengl

@@ -95,7 +95,7 @@ __device__ float collideSphereSphere(Sphere& sphere1, Sphere& sphere2)
 __device__ void kinematicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane, float penetration)
 {
     float3 colNormal = plane.normal;
-    sphere.newImpulse = 0.9 * reflect(sphere.impulse, colNormal);
+    sphere.impulse = 0.9 * reflect(sphere.impulse, colNormal);
     sphere.position += colNormal * penetration;
 }
 
@@ -146,6 +146,22 @@ __device__ void dynamicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sp
 
 
 
+
+/// ------------------------------------------------------ ELASTIC COLLISION RESPONSE  ------------------------------------------------------
+
+__device__ void elasticCollision(Sphere& sphere1, Sphere& sphere2)
+{
+    float3 colNormal = normalize(sphere1.position - sphere2.position);
+    float3 _v1 = sphere1.impulse + (2 * dot(sphere2.impulse - sphere1.impulse, colNormal)) / (1 / sphere1.mass + 1 / sphere2.mass) * (1 / sphere1.mass) * colNormal;
+    float3 _v2 = sphere2.impulse - (2 * dot(sphere2.impulse - sphere1.impulse, colNormal)) / (1 / sphere1.mass + 1 / sphere2.mass) * (1 / sphere2.mass) * colNormal;
+    sphere1.impulse = _v1;
+    sphere2.impulse = _v2;
+}
+
+__device__ void elasticCollision(Sphere& sphere, Plane& plane)
+{
+    float3 colNormal = plane.normal;
+}
 
 
 
