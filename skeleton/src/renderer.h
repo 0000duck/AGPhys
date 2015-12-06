@@ -21,7 +21,6 @@ public:
     VertexBuffer<VertexN> grid_right;
     VertexBuffer<VertexN> grid_front;
     VertexBuffer<VertexN> grid_back;
-    VertexBuffer<VertexN> grid_top;
 
 
     VertexBuffer<CUDA::Plane> planeBuffer;

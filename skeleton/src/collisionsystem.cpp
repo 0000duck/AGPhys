@@ -4,6 +4,8 @@
 #include <ctime>
 
 
+#include "cuda/timing.h"
+
 #define checked_cuda(ans) { gpu_assert((ans), __FILE__, __LINE__); }
 inline void gpu_assert(cudaError_t code, char *file, int line, bool abort=true) {
     if (code != cudaSuccess) {
@@ -31,13 +33,16 @@ void CollisionSystem::init()
     std::vector<CUDA::Sphere> spheres(sphereCount);
 
 
-    for(CUDA::Sphere& p : spheres){
+    for(int i = 0; i < sphereCount; ++i)
+    {
+        CUDA::Sphere& p = spheres[i];
        // p.position = glm::ballRand(5.0f) + vec3(0, 5, 0);
         p.position = vec3(0, 0.5f, 0);
         p.radius = 0.5f;
         p.color = glm::linearRand(vec4(0,0,0,1),vec4(1,1,1,1));
         p.impulse = glm::ballRand(1.0f);
         p.mass = 1;
+        p.id = i;
     }
 
 /*
@@ -57,6 +62,12 @@ void CollisionSystem::init()
 
     sphere_interop.registerGLBuffer(sphereBuffer.getVBO());
 
+
+    reset();
+}
+
+void CollisionSystem::reset()
+{
     sphere_interop.map();
     void* spheres_ptr = sphere_interop.getDevicePtr();
     CUDA::resetSpheres(static_cast<CUDA::Sphere*>(spheres_ptr), sphereCount, 9, 9, -8, 1, -8, 2);
@@ -68,8 +79,22 @@ void CollisionSystem::update(float dt, CUDA::Plane* planes, int planeCount)
     sphere_interop.map();
     void* spheres = sphere_interop.getDevicePtr();
 
-    // TODO: update
-    CUDA::updateAllSpheres(static_cast<CUDA::Sphere*>(spheres), static_cast<CUDA::Plane*>(planes), sphereCount, planeCount, dt);
+    switch (method)
+    {
+        case BRUTE_FORCE:
+            CUDA::updateAllSpheresBruteForce(static_cast<CUDA::Sphere*>(spheres), static_cast<CUDA::Plane*>(planes), sphereCount, planeCount, dt);
+            break;
+
+        case SORT_AND_SWEEP:
+            CUDA::updateAllSpheresSortAndSweep(static_cast<CUDA::Sphere*>(spheres), static_cast<CUDA::Plane*>(planes), sphereCount, planeCount, dt);
+            break;
+
+        case LINKED_CELL:
+            CUDA::updateAllSpheresLinkedCell(static_cast<CUDA::Sphere*>(spheres), static_cast<CUDA::Plane*>(planes), sphereCount, planeCount, dt);
+            break;
+    }
+
+
 
     sphere_interop.unmap();
 
@@ -87,12 +112,30 @@ void CollisionSystem::render(Camera *cam)
 
 void CollisionSystem::keyPressed(int key)
 {
-    switch(key){
+    switch(key)
+    {
         case SDLK_r:
-            sphere_interop.map();
-            void* spheres_ptr = sphere_interop.getDevicePtr();
-            CUDA::resetSpheres(static_cast<CUDA::Sphere*>(spheres_ptr), sphereCount, 10, 10, -7, 0, -7, 1);
-            sphere_interop.unmap();
+        {
+            reset();
+            break;
+        }
+
+        case SDLK_1:
+            method = BRUTE_FORCE;
+            std::cout << "\n Switched to brute-force method" << std::endl;
+            reset();
+            break;
+
+        case SDLK_2:
+            method = SORT_AND_SWEEP;
+            std::cout << "\n Switched to sort and sweep method" << std::endl;
+            reset();
+            break;
+
+        case SDLK_3:
+            method = LINKED_CELL;
+            std::cout << "\n Switched to linked cell method" << std::endl;
+            reset();
             break;
     }
 }

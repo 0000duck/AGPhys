@@ -11,8 +11,7 @@
 
 class CollisionSystem : public SDL_KeyListener
 {
-public:
-
+private:
     int sphereCount = 2000;
 
     VertexBuffer<CUDA::Sphere> sphereBuffer;
@@ -20,6 +19,14 @@ public:
     MVPShader* sphereShader;
 
 
+    enum
+    {
+        BRUTE_FORCE,
+        SORT_AND_SWEEP,
+        LINKED_CELL
+    } method;
+
+public:
     CollisionSystem();
     ~CollisionSystem();
 
@@ -28,6 +35,8 @@ public:
 
     void update(float dt, CUDA::Plane* planes, int planeCount);
     void render(Camera *cam);
+
+    void reset();
 
     void keyPressed(int key);
     void keyReleased(int key);
