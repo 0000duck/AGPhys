@@ -70,7 +70,7 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
 #ifdef KINEMATIC
                 kinematicCollisionResponseSpherePlane(sphere, plane, penetration);
 #else
-                dynamicCollisionResponseSpherePlane(sphere, plane, penetration, dt);
+                dynamicCollisionResponseSpherePlane(sphere, plane, penetration);
 #endif
             }
         }
@@ -85,8 +85,6 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
             float penetration = collideSphereSphere(sphere, other);
             if (penetration != -1.0f)
             {
-                //sphere.color = make_float4(1);
-                //elasticCollision(sphere, other);
                 if (penetration > max)
                 {
                     collider = &other;
@@ -99,24 +97,13 @@ __global__ void collideSpheres(Sphere* spheres, Plane* planes, int numberOfSpher
         {
 
 #ifdef KINEMATIC
-                elasticCollision(sphere, *collider);
+                kinematicCollisionResponseSphereSphere(sphere, *collider, max);
 #else
-                dynamicCollisionResponseSphereSphere(sphere, *collider, max, dt);
+                elasticCollision(sphere, *collider, max);
 #endif
 
         }
 
-    }
-}
-
-__global__ void updateImpulses(Sphere* spheres, int numberOfSpheres)
-{
-    int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    if (tid < numberOfSpheres)
-    {
-        Sphere& sphere = spheres[tid];
-        sphere.impulse = sphere.newImpulse;
-        //sphere.position = sphere.newPosition;
     }
 }
 
@@ -133,6 +120,5 @@ void updateAllSpheres(Sphere* spheres, Plane* planes, int numberOfSpheres, int n
     int blocks = numberOfSpheres / threadsPerBlock + 1;
     integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt); // this way all threads are up to date
     collideSpheres<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes, dt);
-    //updateImpulses<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres);
 }
 }

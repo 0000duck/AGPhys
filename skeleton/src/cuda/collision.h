@@ -102,14 +102,14 @@ __device__ void kinematicCollisionResponseSpherePlane(Sphere& sphere, Plane& pla
 __device__ void kinematicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sphere2, float penetration)
 {
     float3 colNormal = normalize(sphere2.position - sphere1.position);
-    sphere1.newImpulse = 0.9 * reflect(sphere1.impulse, colNormal);
-    sphere1.position += colNormal * 0.5 * penetration;
+    sphere1.impulse = 0.9 * reflect(sphere1.impulse, colNormal);
+    sphere2.impulse = 0.9 * reflect(sphere2.impulse, colNormal);
 
-    //sphere2.newImpulse = 0.9 * reflect(sphere2.impulse, -colNormal);
-    //sphere2.position -= colNormal * 0.5 * penetration;
+    sphere1.position -= colNormal * 0.5 * penetration;
+    sphere2.position += colNormal * 0.5 * penetration;
 }
 
-__device__ void dynamicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane, float penetration, float dt)
+__device__ void dynamicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane, float penetration)
 {
     float3 colNormal = plane.normal;
     float3 vRel      = dot(sphere.impulse, plane.normal) * plane.normal;
@@ -122,11 +122,11 @@ __device__ void dynamicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane
     float3 f_dashpot = lamda_dashpot * vRel * sphere.mass;
     float3 f_shear   = lamda_shear * -1.0f * (sphere.impulse - vRel) * sphere.mass;
 
-    sphere.newImpulse = (f_spring + f_dashpot + f_shear);
-    sphere.position  += colNormal * penetration;
+    sphere.impulse = (f_spring + f_dashpot + f_shear);
+    sphere.position += colNormal * penetration;
 }
 
-__device__ void dynamicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sphere2, float penetration, float dt)
+__device__ void dynamicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sphere2, float penetration)
 {
     float3 colNormal = normalize(sphere2.position - sphere1.position);
     float3 vRel      = (dot(sphere1.impulse, colNormal) * colNormal) - (dot(sphere2.impulse, colNormal) * colNormal);
@@ -139,9 +139,14 @@ __device__ void dynamicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sp
     float3 f_dashpot = lamda_dashpot * vRel * sphere1.mass;
     float3 f_shear   = make_float3(0);
 
-    sphere1.newImpulse = (f_spring + f_dashpot + f_shear);
-    sphere1.position  += colNormal * penetration * 0.5;
+    sphere1.impulse = (f_spring + f_dashpot + f_shear);
+    sphere2.impulse = -1.0f * (f_spring + f_dashpot + f_shear);
+
+    sphere1.position -= colNormal * 0.5 * penetration;
+    sphere2.position += colNormal * 0.5 * penetration;
+
 }
+
 
 
 
@@ -149,18 +154,16 @@ __device__ void dynamicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sp
 
 /// ------------------------------------------------------ ELASTIC COLLISION RESPONSE  ------------------------------------------------------
 
-__device__ void elasticCollision(Sphere& sphere1, Sphere& sphere2)
+__device__ void elasticCollision(Sphere& sphere1, Sphere& sphere2, float penetration)
 {
     float3 colNormal = normalize(sphere1.position - sphere2.position);
     float3 _v1 = sphere1.impulse + (2 * dot(sphere2.impulse - sphere1.impulse, colNormal)) / (1 / sphere1.mass + 1 / sphere2.mass) * (1 / sphere1.mass) * colNormal;
     float3 _v2 = sphere2.impulse - (2 * dot(sphere2.impulse - sphere1.impulse, colNormal)) / (1 / sphere1.mass + 1 / sphere2.mass) * (1 / sphere2.mass) * colNormal;
     sphere1.impulse = _v1;
     sphere2.impulse = _v2;
-}
 
-__device__ void elasticCollision(Sphere& sphere, Plane& plane)
-{
-    float3 colNormal = plane.normal;
+    sphere1.position += colNormal * 0.5 * penetration;
+    sphere2.position -= colNormal * 0.5 * penetration;
 }
 
 
