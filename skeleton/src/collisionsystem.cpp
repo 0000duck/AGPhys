@@ -51,10 +51,13 @@ void CollisionSystem::init()
     }
 
 /*
-    spheres[0].position = vec3(0, 5, 0);
+    spheres[0].position = vec3(-8.4f, -0.4f, -8.4f);
     spheres[0].radius = 0.5f;
-    spheres[0].impulse = vec3(0, 0, 0);
+    spheres[0].impulse = vec3(5, 0, 0);
+    spheres[0].color = vec4(1);
     spheres[0].mass = 1;
+    spheres[0].id = 0;
+    maxRadius = 0.5f;
 
     spheres[1].position = vec3(0, 1.5, 0);
     spheres[1].radius = 0.5f;
@@ -95,7 +98,7 @@ void CollisionSystem::update(float dt, CUDA::Plane* planes, int planeCount)
             break;
 
         case LINKED_CELL:
-            CUDA::updateAllSpheresLinkedCell(static_cast<CUDA::Sphere*>(spheres), static_cast<CUDA::Plane*>(planes), sphereCount, planeCount, dt, glm::vec3(18.f), glm::vec3(-9.f, 0.f, -9.f), maxRadius);
+            CUDA::updateAllSpheresLinkedCell(static_cast<CUDA::Sphere*>(spheres), static_cast<CUDA::Plane*>(planes), sphereCount, planeCount, dt, glm::vec3(18.f), glm::vec3(-9.f, -1.f, -9.f), maxRadius);
             break;
     }
 

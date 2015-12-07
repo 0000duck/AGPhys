@@ -47,9 +47,25 @@ __global__ void integrateSpheres(Sphere* spheres, int numberOfSpheres, float dt)
         Sphere& s = spheres[tid];
 
 #ifdef GRAVITY
-        s.impulse  += dt * make_float3(0, -1, 0); // gravity, breaks everything......
+        s.impulse  += dt * make_float3(0, -1, 0);
 #endif
         s.position += dt * s.impulse;
+
+        /*
+        if (s.position.x >= 8.4f)
+        {
+            if (s.position.z >= 8.0f)
+            {
+                s.position.z = -8.4f;
+                s.position.x = -8.4f;
+                s.position.y += 1.0f;
+            }
+            else
+            {
+                s.position.x = -8.4f;
+                s.position.z += 1.0f;
+            }
+        }*/
 
         // DEBUG
         //s.color = make_float4(s.impulse) / 5 + make_float4(1, 1, 1, 0);
@@ -229,12 +245,15 @@ __device__ int3 computeCellCoords(const float3& position, const float3& cellSize
     return make_int3(floor(relativeCoords.x / cellSize.x), floor(relativeCoords.y / cellSize.y), floor(relativeCoords.z / cellSize.z));
 }
 
-__device__ int computeHash(const int3& cellCoords, const float3& gridSize)
+/**
+  gridSize is the number of cells in each direction, not the total size of the grid
+ */
+__device__ int computeHash(const int3& cellCoords, const int3& gridSize)
 {
     return (gridSize.z * cellCoords.x + cellCoords.z) + (cellCoords.y * gridSize.x * gridSize.z);
 }
 
-__global__ void collideSpheresLinkedCell(Sphere* spheres, int numberOfSpheres, int* cells, int gridSizeX, int gridSizeY, int gridSizeZ,
+__global__ void collideSpheresLinkedCell(Sphere* spheres, int numberOfSpheres, int* cells, float gridSizeX, float gridSizeY, float gridSizeZ,
                                          float cellSizeX, float cellSizeY, float cellSizeZ, float cornerX, float cornerY, float cornerZ)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -243,7 +262,7 @@ __global__ void collideSpheresLinkedCell(Sphere* spheres, int numberOfSpheres, i
         Sphere& sphere = spheres[tid];
 
         int3 cellCoords = computeCellCoords(sphere.position, make_float3(cellSizeX, cellSizeY, cellSizeZ), make_float3(cornerX, cornerY, cornerZ));
-        float3 gridSize = make_float3(gridSizeX, gridSizeY, gridSizeZ);
+        int3 gridSize = make_int3(gridSizeX / cellSizeX, gridSizeY / cellSizeY, gridSizeZ / cellSizeZ);
 
         float max = -1.0f;
         Sphere* collider = NULL;
@@ -256,22 +275,30 @@ __global__ void collideSpheresLinkedCell(Sphere* spheres, int numberOfSpheres, i
                 for (int z = -1; z <= 1; ++z)
                 {
                     int3 offset = make_int3(x, y, z);
-                    int3 testCell = cellCoords - offset;
+                    int3 testCell = cellCoords + offset;
+
+                    if (testCell.x < 0 || testCell.y < 0 || testCell.z < 0
+                            || testCell.x >= gridSize.x || testCell.y >= gridSize.y || testCell.z >= gridSize.z)
+                    {
+                        // out of bounds
+                        continue;
+                    }
+
+
                     int hash = computeHash(testCell, gridSize);
                     int cell = cells[hash];
 
                     while (cell != -1)
                     {
                         Sphere& other = spheres[cell];
+                        cell = other.nextInList;
                         if (other.id == sphere.id)
                         {
                             // self
-                            cell = other.nextInList;
                             continue;
                         }
                         if (other.id > sphere.id)
                         {
-                            cell = other.nextInList;
                             continue;
                         }
 
@@ -281,7 +308,6 @@ __global__ void collideSpheresLinkedCell(Sphere* spheres, int numberOfSpheres, i
                             max = penetration;
                             collider = &other;
                         }
-                        cell = other.nextInList;
                     }
                 }
             }
@@ -300,7 +326,7 @@ __global__ void collideSpheresLinkedCell(Sphere* spheres, int numberOfSpheres, i
     }
 }
 
-__global__ void initCellGrid(Sphere* spheres, int numberOfSpheres, int* cells, int gridSizeX, int gridSizeY, int gridSizeZ,
+__global__ void initCellGrid(Sphere* spheres, int numberOfSpheres, int* cells, float gridSizeX, float gridSizeY, float gridSizeZ,
                              float cellSizeX, float cellSizeY, float cellSizeZ, float cornerX, float cornerY, float cornerZ)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -309,7 +335,7 @@ __global__ void initCellGrid(Sphere* spheres, int numberOfSpheres, int* cells, i
         Sphere& sphere = spheres[tid];
 
         int3 cellCoords = computeCellCoords(sphere.position, make_float3(cellSizeX, cellSizeY, cellSizeZ), make_float3(cornerX, cornerY, cornerZ));
-        int hash = computeHash(cellCoords, make_float3(gridSizeX, gridSizeY, gridSizeZ));
+        int hash = computeHash(cellCoords, make_int3(gridSizeX / cellSizeX, gridSizeY / cellSizeX, gridSizeZ / cellSizeZ));
 
         int currentEntry = atomicExch(&cells[hash], sphere.id);
         sphere.nextInList = currentEntry;
@@ -427,9 +453,10 @@ void updateAllSpheresLinkedCell(Sphere* spheres, Plane* planes, int numberOfSphe
     initCellGrid<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, cellPtr, dim_colDomain.x, dim_colDomain.y, dim_colDomain.z,
                                               cellSize.x, cellSize.y, cellSize.z, offset_colDomain.x, offset_colDomain.y, offset_colDomain.z);
 
-    /*
+
     // debug
-    for (int i = 0; i < cells.size(); ++i)
+    /*
+    for (int i = 0; i < 1000; ++i)
     {
         int sphereID = cells[i];
         if (sphereID != -1)
@@ -437,7 +464,8 @@ void updateAllSpheresLinkedCell(Sphere* spheres, Plane* planes, int numberOfSphe
             std::cout << "Sphere " << sphereID << " in cell " << i << std::endl;
         }
     }
-*/
+    */
+
 
     collideSpheresLinkedCell<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, cellPtr, dim_colDomain.x, dim_colDomain.y, dim_colDomain.z,
                                                           cellSize.x, cellSize.y, cellSize.z, offset_colDomain.x, offset_colDomain.y, offset_colDomain.z);
