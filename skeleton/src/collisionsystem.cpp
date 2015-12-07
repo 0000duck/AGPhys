@@ -4,8 +4,6 @@
 #include <ctime>
 
 
-#include "cuda/timing.h"
-
 #define checked_cuda(ans) { gpu_assert((ans), __FILE__, __LINE__); }
 inline void gpu_assert(cudaError_t code, char *file, int line, bool abort=true) {
     if (code != cudaSuccess) {
@@ -42,7 +40,14 @@ void CollisionSystem::init()
         p.color = glm::linearRand(vec4(0,0,0,1),vec4(1,1,1,1));
         p.impulse = glm::ballRand(1.0f);
         p.mass = 1;
+
         p.id = i;
+        p.nextInList = -1;
+
+        if (p.radius > maxRadius)
+        {
+            maxRadius = p.radius;
+        }
     }
 
 /*
@@ -70,7 +75,7 @@ void CollisionSystem::reset()
 {
     sphere_interop.map();
     void* spheres_ptr = sphere_interop.getDevicePtr();
-    CUDA::resetSpheres(static_cast<CUDA::Sphere*>(spheres_ptr), sphereCount, 9, 9, -8, 1, -8, 2);
+    CUDA::resetSpheres(static_cast<CUDA::Sphere*>(spheres_ptr), sphereCount, 9, 9, glm::vec3(-8.f, 1.f, -8.f), 2);
     sphere_interop.unmap();
 }
 
@@ -90,7 +95,7 @@ void CollisionSystem::update(float dt, CUDA::Plane* planes, int planeCount)
             break;
 
         case LINKED_CELL:
-            CUDA::updateAllSpheresLinkedCell(static_cast<CUDA::Sphere*>(spheres), static_cast<CUDA::Plane*>(planes), sphereCount, planeCount, dt);
+            CUDA::updateAllSpheresLinkedCell(static_cast<CUDA::Sphere*>(spheres), static_cast<CUDA::Plane*>(planes), sphereCount, planeCount, dt, glm::vec3(18.f), glm::vec3(-9.f, 0.f, -9.f), maxRadius);
             break;
     }
 

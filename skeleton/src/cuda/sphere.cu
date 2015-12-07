@@ -223,12 +223,98 @@ __global__ void collideSpheresSortAndSweep(AxisProjection* projections, Sphere* 
 
 /// --------------------------------------------------------------------- LINKED CELL ---------------------------------------------------------------------
 
-__global__ void collideSpheresLinkedCell(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes)
+__device__ int3 computeCellCoords(const float3& position, const float3& cellSize, const float3& corner)
 {
-
+    float3 relativeCoords = position - corner;
+    return make_int3(floor(relativeCoords.x / cellSize.x), floor(relativeCoords.y / cellSize.y), floor(relativeCoords.z / cellSize.z));
 }
 
+__device__ int computeHash(const int3& cellCoords, const float3& gridSize)
+{
+    return (gridSize.z * cellCoords.x + cellCoords.z) + (cellCoords.y * gridSize.x * gridSize.z);
+}
 
+__global__ void collideSpheresLinkedCell(Sphere* spheres, int numberOfSpheres, int* cells, int gridSizeX, int gridSizeY, int gridSizeZ,
+                                         float cellSizeX, float cellSizeY, float cellSizeZ, float cornerX, float cornerY, float cornerZ)
+{
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    if (tid < numberOfSpheres)
+    {
+        Sphere& sphere = spheres[tid];
+
+        int3 cellCoords = computeCellCoords(sphere.position, make_float3(cellSizeX, cellSizeY, cellSizeZ), make_float3(cornerX, cornerY, cornerZ));
+        float3 gridSize = make_float3(gridSizeX, gridSizeY, gridSizeZ);
+
+        float max = -1.0f;
+        Sphere* collider = NULL;
+
+        // loop over 3x3 cell neighborhood
+        for (int x = -1; x <= 1; ++x)
+        {
+            for (int y = -1; y <= 1; ++y)
+            {
+                for (int z = -1; z <= 1; ++z)
+                {
+                    int3 offset = make_int3(x, y, z);
+                    int3 testCell = cellCoords - offset;
+                    int hash = computeHash(testCell, gridSize);
+                    int cell = cells[hash];
+
+                    while (cell != -1)
+                    {
+                        Sphere& other = spheres[cell];
+                        if (other.id == sphere.id)
+                        {
+                            // self
+                            cell = other.nextInList;
+                            continue;
+                        }
+                        if (other.id > sphere.id)
+                        {
+                            cell = other.nextInList;
+                            continue;
+                        }
+
+                        float penetration = collideSphereSphere(sphere, other);
+                        if (penetration > max)
+                        {
+                            max = penetration;
+                            collider = &other;
+                        }
+                        cell = other.nextInList;
+                    }
+                }
+            }
+        }
+
+        if (max > -1.0f)
+        {
+
+#ifdef KINEMATIC
+                kinematicCollisionResponseSphereSphere(sphere, *collider, max);
+#else
+                elasticCollision(sphere, *collider, max);
+#endif
+
+        }
+    }
+}
+
+__global__ void initCellGrid(Sphere* spheres, int numberOfSpheres, int* cells, int gridSizeX, int gridSizeY, int gridSizeZ,
+                             float cellSizeX, float cellSizeY, float cellSizeZ, float cornerX, float cornerY, float cornerZ)
+{
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    if (tid < numberOfSpheres)
+    {
+        Sphere& sphere = spheres[tid];
+
+        int3 cellCoords = computeCellCoords(sphere.position, make_float3(cellSizeX, cellSizeY, cellSizeZ), make_float3(cornerX, cornerY, cornerZ));
+        int hash = computeHash(cellCoords, make_float3(gridSizeX, gridSizeY, gridSizeZ));
+
+        int currentEntry = atomicExch(&cells[hash], sphere.id);
+        sphere.nextInList = currentEntry;
+    }
+}
 
 
 
@@ -237,11 +323,11 @@ __global__ void collideSpheresLinkedCell(Sphere* spheres, Plane* planes, int num
 
 /// ------------------------------------------------------------------------- CPU -------------------------------------------------------------------------
 
-void resetSpheres(Sphere* spheres, int numberOfSpheres, int x, int z, float cornerX, float cornerY, float cornerZ, float distance)
+void resetSpheres(Sphere* spheres, int numberOfSpheres, int x, int z, const glm::vec3& corner, float distance)
 {
     int threadsPerBlock = 128;
     int blocks = numberOfSpheres / threadsPerBlock + 1;
-    resetSpheresGrid<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, x, z, cornerX, cornerY, cornerZ, distance);
+    resetSpheresGrid<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, x, z, corner.x, corner.y, corner.z, distance);
 }
 
 
@@ -281,6 +367,7 @@ void updateAllSpheresBruteForce(Sphere* spheres, Plane* planes, int numberOfSphe
 
 void updateAllSpheresSortAndSweep(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes, float dt)
 {
+    /*
     int threadsPerBlock = 128;
     int blocks = numberOfSpheres / threadsPerBlock + 1;
     integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt);
@@ -292,10 +379,10 @@ void updateAllSpheresSortAndSweep(Sphere* spheres, Plane* planes, int numberOfSp
 
     thrust::device_vector<AxisProjection> projectionVector(numberOfSpheres * 2);
 
-    thrust::device_ptr<Sphere> dev_ptr1(spheres);
-    thrust::device_ptr<Sphere> dev_ptr2(spheres + numberOfSpheres);
-    thrust::transform(dev_ptr1, dev_ptr2, projectionVector.begin(), FillWithStartPoints());
-    thrust::transform(dev_ptr1, dev_ptr2, projectionVector.begin() + numberOfSpheres, FillWithEndPoints());
+    thrust::device_ptr<Sphere> start(spheres);
+    thrust::device_ptr<Sphere> end(spheres + numberOfSpheres);
+    thrust::transform(start, end, projectionVector.begin(), FillWithStartPoints());
+    thrust::transform(start, end, projectionVector.begin() + numberOfSpheres, FillWithEndPoints());
     thrust::sort(projectionVector.begin(), projectionVector.end(), Sort());
 
     AxisProjection* projectionPtr = thrust::raw_pointer_cast(projectionVector.data());
@@ -317,9 +404,10 @@ void updateAllSpheresSortAndSweep(Sphere* spheres, Plane* planes, int numberOfSp
         accDts = 0.0f;
         numberOfSamples = 0;
     }
+    */
 }
 
-void updateAllSpheresLinkedCell(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes, float dt)
+void updateAllSpheresLinkedCell(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes, float dt, const glm::vec3 &dim_colDomain, const glm::vec3 &offset_colDomain, float maxRadius)
 {
     int threadsPerBlock = 128;
     int blocks = numberOfSpheres / threadsPerBlock + 1;
@@ -327,7 +415,32 @@ void updateAllSpheresLinkedCell(Sphere* spheres, Plane* planes, int numberOfSphe
 
 
     startTiming();
-    collideSpheresLinkedCell<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes);
+
+    collidePlanes<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes);
+
+    // create 3d grid
+    glm::vec3 numberOfCells = dim_colDomain / (maxRadius * 2);
+    glm::floor(numberOfCells);
+    glm::vec3 cellSize(dim_colDomain.x / numberOfCells.x, dim_colDomain.y / numberOfCells.y, dim_colDomain.z / numberOfCells.z);
+    thrust::device_vector<int> cells(numberOfCells.x * numberOfCells.y * numberOfCells.z, -1);
+    int* cellPtr = thrust::raw_pointer_cast(cells.data());
+    initCellGrid<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, cellPtr, dim_colDomain.x, dim_colDomain.y, dim_colDomain.z,
+                                              cellSize.x, cellSize.y, cellSize.z, offset_colDomain.x, offset_colDomain.y, offset_colDomain.z);
+
+    /*
+    // debug
+    for (int i = 0; i < cells.size(); ++i)
+    {
+        int sphereID = cells[i];
+        if (sphereID != -1)
+        {
+            std::cout << "Sphere " << sphereID << " in cell " << i << std::endl;
+        }
+    }
+*/
+
+    collideSpheresLinkedCell<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, cellPtr, dim_colDomain.x, dim_colDomain.y, dim_colDomain.z,
+                                                          cellSize.x, cellSize.y, cellSize.z, offset_colDomain.x, offset_colDomain.y, offset_colDomain.z);
     float time = endTiming();
 
     numberOfSamples++;

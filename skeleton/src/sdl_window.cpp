@@ -130,7 +130,6 @@ void sdl_Window::keyPressed(int key)
 {
     switch(key){
         case SDLK_ESCAPE:
-            std::cout << std::endl;
             running = false;
     }
 }
