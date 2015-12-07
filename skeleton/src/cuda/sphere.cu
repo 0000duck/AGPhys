@@ -366,12 +366,13 @@ void updateAllSpheresBruteForce(Sphere* spheres, Plane* planes, int numberOfSphe
 {
     int threadsPerBlock = 128;
     int blocks = numberOfSpheres / threadsPerBlock + 1;
-    integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt);
-
 
     startTiming();
+
+    integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt);
     collidePlanes<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes);
     collideSpheresBruteForce<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres);
+
     float time = endTiming();
 
     numberOfSamples++;
@@ -395,11 +396,10 @@ void updateAllSpheresSortAndSweep(Sphere* spheres, Plane* planes, int numberOfSp
 {
     int threadsPerBlock = 128;
     int blocks = numberOfSpheres / threadsPerBlock + 1;
-    integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt);
-
 
     startTiming();
 
+    integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt);
     collidePlanes<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes);
 
     thrust::device_vector<AxisProjection> projectionVector(numberOfSpheres * 2);
@@ -447,11 +447,10 @@ void updateAllSpheresLinkedCell(Sphere* spheres, Plane* planes, int numberOfSphe
 {
     int threadsPerBlock = 128;
     int blocks = numberOfSpheres / threadsPerBlock + 1;
-    integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt);
-
 
     startTiming();
 
+    integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt);
     collidePlanes<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes);
 
     // create 3d grid
