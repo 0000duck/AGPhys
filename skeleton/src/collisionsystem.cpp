@@ -31,14 +31,16 @@ void CollisionSystem::init()
     std::vector<CUDA::Sphere> spheres(sphereCount);
 
 
-    for(int i = 0; i < sphereCount; ++i)
+    for (int i = 0; i < sphereCount; ++i)
     {
         CUDA::Sphere& p = spheres[i];
        // p.position = glm::ballRand(5.0f) + vec3(0, 5, 0);
         p.position = vec3(0, 0.5f, 0);
         p.radius = 0.5f;
+        //p.radius = (std::rand() % 5) * 0.5f; // note: change reset method, when using this!
         p.color = glm::linearRand(vec4(0,0,0,1),vec4(1,1,1,1));
         p.impulse = glm::ballRand(1.0f);
+        //p.impulse = glm::vec3(0.f);
         p.mass = 1;
 
         p.id = i;
@@ -53,7 +55,7 @@ void CollisionSystem::init()
 /*
     spheres[0].position = vec3(-8.4f, -0.4f, -8.4f);
     spheres[0].radius = 0.5f;
-    spheres[0].impulse = vec3(5, 0, 0);
+    spheres[0].impulse = vec3(0, 0, 0);
     spheres[0].color = vec4(1);
     spheres[0].mass = 1;
     spheres[0].id = 0;

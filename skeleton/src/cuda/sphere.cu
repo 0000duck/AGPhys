@@ -114,13 +114,11 @@ __global__ void collideSpheresBruteForce(Sphere* spheres, int numberOfSpheres)
             if (s == tid) continue;
             Sphere& other = spheres[s];
             float penetration = collideSphereSphere(sphere, other);
-            if (penetration != -1.0f)
+
+            if (penetration > max)
             {
-                if (penetration > max)
-                {
-                    collider = &other;
-                    max = penetration;
-                }
+                collider = &other;
+                max = penetration;
             }
         }
 
@@ -189,8 +187,11 @@ __global__ void collideSpheresSortAndSweep(AxisProjection* projections, Sphere* 
     if (tid < numberOfProjections)
     {
         AxisProjection& projection = projections[tid];
+        Sphere& sphere = spheres[projection.sphereID];
+
         if (!projection.startPoint)
         {
+            // endpoint
             return;
         }
 
@@ -199,27 +200,26 @@ __global__ void collideSpheresSortAndSweep(AxisProjection* projections, Sphere* 
 
         for (int i = tid + 1;; ++i)
         {
-            AxisProjection& other = projections[i];
+            AxisProjection& other_proj = projections[i];
+            Sphere& other = spheres[other_proj.sphereID];
 
-            if (other.sphereID == projection.sphereID)
+            if (sphere.id == other.id)
             {
                 // endpoint of own sphere
                 break;
             }
 
-            if (!other.startPoint || other.sphereID > projection.sphereID)
+            if (!other_proj.startPoint)
             {
+                // endpoint of other sphere -> ignore
                 continue;
             }
 
-            float penetration = collideSphereSphere(spheres[projection.sphereID], spheres[other.sphereID]);
-            if (penetration != -1.0f)
+            float penetration = collideSphereSphere(sphere, other);
+            if (penetration > max)
             {
-                if (penetration > max)
-                {
-                    collider = &spheres[other.sphereID];
-                    max = penetration;
-                }
+                collider = &other;
+                max = penetration;
             }
         }
 
@@ -227,9 +227,9 @@ __global__ void collideSpheresSortAndSweep(AxisProjection* projections, Sphere* 
         {
 
 #ifdef KINEMATIC
-            kinematicCollisionResponseSphereSphere(spheres[projection.sphereID], *collider, max);
+            kinematicCollisionResponseSphereSphere(sphere, *collider, max);
 #else
-            elasticCollision(spheres[projection.sphereID], *collider, max);
+            elasticCollision(sphere, *collider, max);
 #endif
 
         }
@@ -393,7 +393,6 @@ void updateAllSpheresBruteForce(Sphere* spheres, Plane* planes, int numberOfSphe
 
 void updateAllSpheresSortAndSweep(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes, float dt)
 {
-    /*
     int threadsPerBlock = 128;
     int blocks = numberOfSpheres / threadsPerBlock + 1;
     integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt);
@@ -411,9 +410,20 @@ void updateAllSpheresSortAndSweep(Sphere* spheres, Plane* planes, int numberOfSp
     thrust::transform(start, end, projectionVector.begin() + numberOfSpheres, FillWithEndPoints());
     thrust::sort(projectionVector.begin(), projectionVector.end(), Sort());
 
+    // debug
+    /*
+    std::cout << "Size: " << projectionVector.size() << "-------------------" << std::endl;
+    for (int i = 0; i < projectionVector.size(); i++)
+    {
+        AxisProjection a = projectionVector[i];
+        std::cout << "Sphere " << a.sphereID << ": Value:" << a.value << ", " << ((a.startPoint) ? "true" : "false") << std::endl;
+    }
+    */
+
     AxisProjection* projectionPtr = thrust::raw_pointer_cast(projectionVector.data());
 
-    collideSpheresSortAndSweep<<<blocks * 2, threadsPerBlock>>>(projectionPtr, spheres, numberOfSpheres * 2);
+    blocks = (numberOfSpheres * 2) / threadsPerBlock + 1;
+    collideSpheresSortAndSweep<<<blocks, threadsPerBlock>>>(projectionPtr, spheres, numberOfSpheres * 2);
 
     float time = endTiming();
 
@@ -430,7 +440,7 @@ void updateAllSpheresSortAndSweep(Sphere* spheres, Plane* planes, int numberOfSp
         accDts = 0.0f;
         numberOfSamples = 0;
     }
-    */
+
 }
 
 void updateAllSpheresLinkedCell(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes, float dt, const glm::vec3 &dim_colDomain, const glm::vec3 &offset_colDomain, float maxRadius)

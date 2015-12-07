@@ -32,7 +32,7 @@ public:
 
     Controllable_Camera(camera_t* cam):cam(cam){
         cam->rot = glm::quat_cast(cam->model);
-        sdlKeys = {SDLK_UP,SDLK_DOWN,SDLK_LEFT,SDLK_RIGHT,SDLK_0};
+        sdlKeys = {SDLK_w,SDLK_s,SDLK_a,SDLK_d,SDLK_0};
     }
 
     ~Controllable_Camera(){ }

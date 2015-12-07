@@ -16,9 +16,9 @@ private:
     float maxRadius = 0.0f;
 
     VertexBuffer<CUDA::Sphere> sphereBuffer;
+    Interop	sphere_interop;
 
     MVPShader* sphereShader;
-
 
     enum
     {
@@ -41,8 +41,6 @@ public:
 
     void keyPressed(int key);
     void keyReleased(int key);
-
-    Interop	sphere_interop;
 
 };
 
