@@ -34,13 +34,11 @@ void CollisionSystem::init()
     for (int i = 0; i < sphereCount; ++i)
     {
         CUDA::Sphere& p = spheres[i];
-       // p.position = glm::ballRand(5.0f) + vec3(0, 5, 0);
-        p.position = vec3(0, 0.5f, 0);
+        p.position = vec3(0, 0.5f, 0); // doesn't matter as the position will be initialized in the reset function
         p.radius = 0.5f;
-        //p.radius = (std::rand() % 5) * 0.5f; // note: change reset method, when using this!
+        //p.radius = ((std::rand() % 40) + 10) / 100.f; // 0.1 - 0.5 radius
         p.color = glm::linearRand(vec4(0,0,0,1),vec4(1,1,1,1));
-        p.impulse = glm::ballRand(1.0f);
-        //p.impulse = glm::vec3(0.f);
+        p.impulse = glm::ballRand(2.0f);
         p.mass = 1;
 
         p.id = i;
@@ -52,7 +50,7 @@ void CollisionSystem::init()
         }
     }
 
-/*
+/*  // debug
     spheres[0].position = vec3(-8.4f, -0.4f, -8.4f);
     spheres[0].radius = 0.5f;
     spheres[0].impulse = vec3(0, 0, 0);
@@ -89,6 +87,8 @@ void CollisionSystem::update(float dt, CUDA::Plane* planes, int planeCount)
     sphere_interop.map();
     void* spheres = sphere_interop.getDevicePtr();
 
+    glm::vec3 colArea(18.f, 60.f, 18.f); // for linked cell. declares the area to partition into cell grid
+
     switch (method)
     {
         case BRUTE_FORCE:
@@ -100,7 +100,7 @@ void CollisionSystem::update(float dt, CUDA::Plane* planes, int planeCount)
             break;
 
         case LINKED_CELL:
-            CUDA::updateAllSpheresLinkedCell(static_cast<CUDA::Sphere*>(spheres), static_cast<CUDA::Plane*>(planes), sphereCount, planeCount, dt, glm::vec3(18.f), glm::vec3(-9.f, -1.f, -9.f), maxRadius);
+            CUDA::updateAllSpheresLinkedCell(static_cast<CUDA::Sphere*>(spheres), static_cast<CUDA::Plane*>(planes), sphereCount, planeCount, dt, colArea, glm::vec3(-9.f, -1.f, -9.f), maxRadius);
             break;
     }
 

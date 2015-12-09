@@ -89,11 +89,6 @@ void ParticleSystem::render(Camera *cam)
 
 void ParticleSystem::keyPressed(int key)
 {
-    switch(key){
-        case SDLK_a:
-            cout<<"A pressed :)"<<endl;
-            break;
-    }
 }
 
 void ParticleSystem::keyReleased(int key)

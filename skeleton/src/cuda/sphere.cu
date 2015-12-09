@@ -47,28 +47,10 @@ __global__ void integrateSpheres(Sphere* spheres, int numberOfSpheres, float dt)
         Sphere& s = spheres[tid];
 
 #ifdef GRAVITY
-        s.impulse  += dt * make_float3(0, -1, 0);
+        s.impulse  += dt * make_float3(0, -1.5, 0);
 #endif
         s.position += dt * s.impulse;
 
-        /*
-        if (s.position.x >= 8.4f)
-        {
-            if (s.position.z >= 8.0f)
-            {
-                s.position.z = -8.4f;
-                s.position.x = -8.4f;
-                s.position.y += 1.0f;
-            }
-            else
-            {
-                s.position.x = -8.4f;
-                s.position.z += 1.0f;
-            }
-        }*/
-
-        // DEBUG
-        //s.color = make_float4(s.impulse) / 5 + make_float4(1, 1, 1, 0);
     }
 
 }
@@ -239,7 +221,7 @@ __global__ void collideSpheresSortAndSweep(AxisProjection* projections, Sphere* 
 
 /// --------------------------------------------------------------------- LINKED CELL ---------------------------------------------------------------------
 
-__device__ int3 computeCellCoords(const float3& position, const float3& cellSize, const float3& corner)
+__device__ int3 inline computeCellCoords(const float3& position, const float3& cellSize, const float3& corner)
 {
     float3 relativeCoords = position - corner;
     return make_int3(floor(relativeCoords.x / cellSize.x), floor(relativeCoords.y / cellSize.y), floor(relativeCoords.z / cellSize.z));
@@ -248,7 +230,7 @@ __device__ int3 computeCellCoords(const float3& position, const float3& cellSize
 /**
   gridSize is the number of cells in each direction, not the total size of the grid
  */
-__device__ int computeHash(const int3& cellCoords, const int3& gridSize)
+__device__ inline int computeHash(const int3& cellCoords, const int3& gridSize)
 {
     return (gridSize.z * cellCoords.x + cellCoords.z) + (cellCoords.y * gridSize.x * gridSize.z);
 }
@@ -261,8 +243,8 @@ __global__ void collideSpheresLinkedCell(Sphere* spheres, int numberOfSpheres, i
     {
         Sphere& sphere = spheres[tid];
 
-        int3 cellCoords = computeCellCoords(sphere.position, make_float3(cellSizeX, cellSizeY, cellSizeZ), make_float3(cornerX, cornerY, cornerZ));
-        int3 gridSize = make_int3(gridSizeX / cellSizeX, gridSizeY / cellSizeY, gridSizeZ / cellSizeZ);
+        int3 cellCoords = computeCellCoords(sphere.position, make_float3(cellSizeX, cellSizeY, cellSizeZ), make_float3(cornerX, cornerY, cornerZ)); // which cell is sphere in
+        int3 gridSize = make_int3(gridSizeX / cellSizeX, gridSizeY / cellSizeY, gridSizeZ / cellSizeZ); // number of cells in each dimension
 
         float max = -1.0f;
         Sphere* collider = NULL;
@@ -299,6 +281,7 @@ __global__ void collideSpheresLinkedCell(Sphere* spheres, int numberOfSpheres, i
                         }
                         if (other.id > sphere.id)
                         {
+                            // as in all methods, I only resolve collisions with spheres with smaller IDs to avoid concurrency problems
                             continue;
                         }
 

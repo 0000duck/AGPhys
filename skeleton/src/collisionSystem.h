@@ -12,7 +12,7 @@
 class CollisionSystem : public SDL_KeyListener
 {
 private:
-    int sphereCount = 2000;
+    int sphereCount = 20000; // note: adapt the collision area for the linked cell algorithm when using a lot more spheres: collisionSystem.cpp line ~91
     float maxRadius = 0.0f;
 
     VertexBuffer<CUDA::Sphere> sphereBuffer;
