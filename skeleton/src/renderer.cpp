@@ -77,6 +77,11 @@ void myRenderer::init()
     cout<<"Renderer Initialized!"<<endl;
 }
 
+void myRenderer::shutdown()
+{
+    collisionSystem.shutdown();
+}
+
 void myRenderer::update(float dt){
     //particleSystem.update(dt);
     plane_interop.map();

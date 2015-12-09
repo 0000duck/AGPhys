@@ -1,6 +1,5 @@
 
 #include "sdl_window.h"
-#include "cuda/timing.h"
 
 sdl_Window::sdl_Window(const std::string &name, int width, int height):name(name),width(width),height(height),cam("test cam"),ccam(&cam)
 {
@@ -109,8 +108,6 @@ void sdl_Window::startMainLoop(){
 
     running = true;
 
-    initTiming();
-
     while( running ){
         eventHandler.update();
         running &= !eventHandler.shouldQuit();
@@ -122,7 +119,7 @@ void sdl_Window::startMainLoop(){
         SDL_GL_SwapWindow( gWindow );
     }
 
-    shutdownTiming();
+    renderer.shutdown();
 
 }
 

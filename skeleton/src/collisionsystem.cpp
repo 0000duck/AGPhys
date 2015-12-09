@@ -3,6 +3,8 @@
 #include <random>
 #include <ctime>
 
+#include "cuda/timing.h"
+
 
 #define checked_cuda(ans) { gpu_assert((ans), __FILE__, __LINE__); }
 inline void gpu_assert(cudaError_t code, char *file, int line, bool abort=true) {
@@ -70,8 +72,14 @@ void CollisionSystem::init()
 
     sphere_interop.registerGLBuffer(sphereBuffer.getVBO());
 
+    initTiming();
 
     reset();
+}
+
+void CollisionSystem::shutdown()
+{
+    shutdownTiming();
 }
 
 void CollisionSystem::reset()

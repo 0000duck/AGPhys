@@ -12,7 +12,7 @@
 class CollisionSystem : public SDL_KeyListener
 {
 private:
-    int sphereCount = 20000; // note: adapt the collision area for the linked cell algorithm when using a lot more spheres: collisionSystem.cpp line ~91
+    int sphereCount = 50000; // note: adapt the collision area for the linked cell algorithm when using a lot more spheres: collisionSystem.cpp line ~91
     float maxRadius = 0.0f;
 
     VertexBuffer<CUDA::Sphere> sphereBuffer;
@@ -25,14 +25,14 @@ private:
         BRUTE_FORCE,
         SORT_AND_SWEEP,
         LINKED_CELL
-    } method;
+    } method = BRUTE_FORCE;
 
 public:
     CollisionSystem();
     ~CollisionSystem();
 
     void init();
-
+    void shutdown();
 
     void update(float dt, CUDA::Plane* planes, int planeCount);
     void render(Camera *cam);

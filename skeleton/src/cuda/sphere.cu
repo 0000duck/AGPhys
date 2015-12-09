@@ -19,6 +19,17 @@
 #include "collision.h"
 #include "timing.h"
 
+
+namespace {
+#define checked_cuda(ans) { gpu_assert((ans), __FILE__, __LINE__); }
+inline void gpu_assert(cudaError_t code, char *file, int line, bool abort=true) {
+    if (code != cudaSuccess) {
+        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        if (abort) exit(code);
+    }
+}
+}
+
 namespace CUDA {
 
 __global__ void resetSpheresGrid(Sphere* spheres, int numberOfSpheres, int x, int z, float cornerX, float cornerY, float cornerZ, float distance)
@@ -318,6 +329,15 @@ __global__ void initCellGrid(Sphere* spheres, int numberOfSpheres, int* cells, f
         Sphere& sphere = spheres[tid];
 
         int3 cellCoords = computeCellCoords(sphere.position, make_float3(cellSizeX, cellSizeY, cellSizeZ), make_float3(cornerX, cornerY, cornerZ));
+        int3 gridSize = make_int3(gridSizeX / cellSizeX, gridSizeY / cellSizeY, gridSizeZ / cellSizeZ); // number of cells in each dimension
+        if (cellCoords.x < 0 || cellCoords.y < 0 || cellCoords.z < 0
+                || cellCoords.x >= gridSize.x || cellCoords.y >= gridSize.y || cellCoords.z >= gridSize.z)
+        {
+            // out of bounds
+            return;
+        }
+
+
         int hash = computeHash(cellCoords, make_int3(gridSizeX / cellSizeX, gridSizeY / cellSizeX, gridSizeZ / cellSizeZ));
 
         int currentEntry = atomicExch(&cells[hash], sphere.id);
@@ -393,16 +413,6 @@ void updateAllSpheresSortAndSweep(Sphere* spheres, Plane* planes, int numberOfSp
     thrust::transform(start, end, projectionVector.begin() + numberOfSpheres, FillWithEndPoints());
     thrust::sort(projectionVector.begin(), projectionVector.end(), Sort());
 
-    // debug
-    /*
-    std::cout << "Size: " << projectionVector.size() << "-------------------" << std::endl;
-    for (int i = 0; i < projectionVector.size(); i++)
-    {
-        AxisProjection a = projectionVector[i];
-        std::cout << "Sphere " << a.sphereID << ": Value:" << a.value << ", " << ((a.startPoint) ? "true" : "false") << std::endl;
-    }
-    */
-
     AxisProjection* projectionPtr = thrust::raw_pointer_cast(projectionVector.data());
 
     blocks = (numberOfSpheres * 2) / threadsPerBlock + 1;
@@ -432,35 +442,26 @@ void updateAllSpheresLinkedCell(Sphere* spheres, Plane* planes, int numberOfSphe
     int blocks = numberOfSpheres / threadsPerBlock + 1;
 
     startTiming();
-
+checked_cuda(cudaDeviceSynchronize());
     integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt);
+    checked_cuda(cudaDeviceSynchronize());
     collidePlanes<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes);
-
+checked_cuda(cudaDeviceSynchronize());
     // create 3d grid
     glm::vec3 numberOfCells = dim_colDomain / (maxRadius * 2);
     glm::floor(numberOfCells);
     glm::vec3 cellSize(dim_colDomain.x / numberOfCells.x, dim_colDomain.y / numberOfCells.y, dim_colDomain.z / numberOfCells.z);
     thrust::device_vector<int> cells(numberOfCells.x * numberOfCells.y * numberOfCells.z, -1);
+    checked_cuda(cudaDeviceSynchronize());
     int* cellPtr = thrust::raw_pointer_cast(cells.data());
     initCellGrid<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, cellPtr, dim_colDomain.x, dim_colDomain.y, dim_colDomain.z,
                                               cellSize.x, cellSize.y, cellSize.z, offset_colDomain.x, offset_colDomain.y, offset_colDomain.z);
 
-
-    // debug
-    /*
-    for (int i = 0; i < 1000; ++i)
-    {
-        int sphereID = cells[i];
-        if (sphereID != -1)
-        {
-            std::cout << "Sphere " << sphereID << " in cell " << i << std::endl;
-        }
-    }
-    */
-
+    checked_cuda(cudaDeviceSynchronize());
 
     collideSpheresLinkedCell<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, cellPtr, dim_colDomain.x, dim_colDomain.y, dim_colDomain.z,
                                                           cellSize.x, cellSize.y, cellSize.z, offset_colDomain.x, offset_colDomain.y, offset_colDomain.z);
+    checked_cuda(cudaDeviceSynchronize());
     float time = endTiming();
 
     numberOfSamples++;
@@ -476,6 +477,8 @@ void updateAllSpheresLinkedCell(Sphere* spheres, Plane* planes, int numberOfSphe
         accDts = 0.0f;
         numberOfSamples = 0;
     }
+
+    checked_cuda(cudaDeviceSynchronize());
 }
 
 

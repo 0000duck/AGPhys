@@ -36,6 +36,7 @@ public:
     ~myRenderer();
 
     void init();
+    void shutdown();
 
 
     void update(float dt);
