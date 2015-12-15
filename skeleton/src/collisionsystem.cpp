@@ -1,5 +1,7 @@
 #include "collisionSystem.h"
 #include "saiga/opengl/shader/shaderLoader.h"
+#include "saiga/opengl/objloader.h"
+#include "raytracer.h"
 #include <random>
 #include <ctime>
 
@@ -29,6 +31,7 @@ void CollisionSystem::init()
     std::srand(std::time(NULL));
     sphereShader = ShaderLoader::instance()->load<MVPShader>("particles.glsl");
 
+
     //initialize spheres with some random values
     std::vector<CUDA::Sphere> spheres(sphereCount);
 
@@ -52,20 +55,6 @@ void CollisionSystem::init()
         }
     }
 
-/*  // debug
-    spheres[0].position = vec3(-8.4f, -0.4f, -8.4f);
-    spheres[0].radius = 0.5f;
-    spheres[0].impulse = vec3(0, 0, 0);
-    spheres[0].color = vec4(1);
-    spheres[0].mass = 1;
-    spheres[0].id = 0;
-    maxRadius = 0.5f;
-
-    spheres[1].position = vec3(0, 1.5, 0);
-    spheres[1].radius = 0.5f;
-    spheres[1].impulse = vec3(0, 0, 0);
-    spheres[1].mass = 1;
-*/
     //upload sphere array to opengl
     sphereBuffer.set(spheres);
     sphereBuffer.setDrawMode(GL_POINTS);
@@ -75,6 +64,18 @@ void CollisionSystem::init()
     initTiming();
 
     reset();
+
+
+    // load teapot
+    ObjLoader* loader = ObjLoader::instance();
+    RayTracer* raytracer = RayTracer::instance();
+    teapot_mesh = loader->loadFromFile("objs/teapot.obj", NoParams());
+    teapot_mesh->createBuffers(teapot_buffer);
+    teapotShader = ShaderLoader::instance()->load<MVPShader>("object.glsl");
+    std::vector<CUDA::Sphere> teapotSpheres;
+    raytracer->fillBufferWithSpheres(teapot_mesh, teapotSpheres, 0.2f);
+    teapot_sphere_buffer.set(teapotSpheres);
+    teapot_sphere_buffer.setDrawMode(GL_POINTS);
 }
 
 void CollisionSystem::shutdown()
@@ -95,7 +96,7 @@ void CollisionSystem::update(float dt, CUDA::Plane* planes, int planeCount)
     sphere_interop.map();
     void* spheres = sphere_interop.getDevicePtr();
 
-    glm::vec3 colArea(18.f, 60.f, 18.f); // for linked cell. declares the area to partition into cell grid
+    glm::vec3 colArea(18.f, 50.f, 18.f); // for linked cell. declares the area to partition into cell grid
 
     switch (method)
     {
@@ -124,8 +125,14 @@ void CollisionSystem::render(Camera *cam)
     //render the particles from the viewpoint of the camera
     sphereShader->bind();
     sphereShader->uploadAll(mat4(),cam->view,cam->proj);
-    sphereBuffer.bindAndDraw();
+    //sphereBuffer.bindAndDraw();
+    teapot_sphere_buffer.bindAndDraw();
     sphereShader->unbind();
+
+    teapotShader->bind();
+    teapotShader->uploadAll(mat4(), cam->view, cam->proj);
+    //teapot_buffer.bindAndDraw();
+    teapotShader->unbind();
 }
 
 void CollisionSystem::keyPressed(int key)

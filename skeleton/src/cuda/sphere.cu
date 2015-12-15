@@ -146,7 +146,7 @@ struct FillWithStartPoints
     {
         AxisProjection b;
         b.startPoint = true;
-        b.value = s.position.x - s.radius;
+        b.value = s.position.y - s.radius;
         b.sphereID = s.id;
         return b;
     }
@@ -158,7 +158,7 @@ struct FillWithEndPoints
     {
         AxisProjection e;
         e.startPoint = false;
-        e.value = s.position.x + s.radius;
+        e.value = s.position.y + s.radius;
         e.sphereID = s.id;
         return e;
     }
@@ -442,26 +442,24 @@ void updateAllSpheresLinkedCell(Sphere* spheres, Plane* planes, int numberOfSphe
     int blocks = numberOfSpheres / threadsPerBlock + 1;
 
     startTiming();
-checked_cuda(cudaDeviceSynchronize());
+
     integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt);
-    checked_cuda(cudaDeviceSynchronize());
     collidePlanes<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes);
-checked_cuda(cudaDeviceSynchronize());
+
     // create 3d grid
     glm::vec3 numberOfCells = dim_colDomain / (maxRadius * 2);
     glm::floor(numberOfCells);
     glm::vec3 cellSize(dim_colDomain.x / numberOfCells.x, dim_colDomain.y / numberOfCells.y, dim_colDomain.z / numberOfCells.z);
     thrust::device_vector<int> cells(numberOfCells.x * numberOfCells.y * numberOfCells.z, -1);
-    checked_cuda(cudaDeviceSynchronize());
+
     int* cellPtr = thrust::raw_pointer_cast(cells.data());
     initCellGrid<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, cellPtr, dim_colDomain.x, dim_colDomain.y, dim_colDomain.z,
                                               cellSize.x, cellSize.y, cellSize.z, offset_colDomain.x, offset_colDomain.y, offset_colDomain.z);
 
-    checked_cuda(cudaDeviceSynchronize());
 
     collideSpheresLinkedCell<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, cellPtr, dim_colDomain.x, dim_colDomain.y, dim_colDomain.z,
                                                           cellSize.x, cellSize.y, cellSize.z, offset_colDomain.x, offset_colDomain.y, offset_colDomain.z);
-    checked_cuda(cudaDeviceSynchronize());
+
     float time = endTiming();
 
     numberOfSamples++;
@@ -478,7 +476,7 @@ checked_cuda(cudaDeviceSynchronize());
         numberOfSamples = 0;
     }
 
-    checked_cuda(cudaDeviceSynchronize());
+    checked_cuda(cudaDeviceSynchronize()); // necessary?
 }
 
 
