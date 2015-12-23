@@ -21,7 +21,7 @@ void main() {
 	normal = (MV * vec4(in_normal, 0.0)).xyz;
 	textureCoords = in_texture;
 	lightDir = normalize((view*vec4(1,1,1,0)).xyz);
-	gl_Position = MVP * in_position;
+	gl_Position = MVP * vec4(in_position, 1.0);
 }
 
 

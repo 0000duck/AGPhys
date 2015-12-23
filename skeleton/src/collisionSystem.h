@@ -7,6 +7,7 @@
 #include "saiga/opengl/indexedVertexBuffer.h"
 #include "cuda/sphere.h"
 #include "cuda/plane.h"
+#include "cuda/rigidbody.h"
 #include "camera.h"
 #include "sdl/sdl_eventhandler.h"
 #include "cuda/interop.h"
@@ -14,12 +15,14 @@
 class CollisionSystem : public SDL_KeyListener
 {
 private:
-    int sphereCount = 5000; // note: adapt the collision area for the linked cell algorithm when using a lot more spheres: collisionSystem.cpp line ~98
+    int sphereCount = 2000; // note: adapt the collision area for the linked cell algorithm when using a lot more spheres: collisionSystem.cpp line ~98
     float maxRadius = 0.0f;
 
-    MaterialMesh<VertexNT,GLuint>* teapot_mesh;
     IndexedVertexBuffer<VertexNT,GLuint> teapot_buffer;
-    VertexBuffer<CUDA::Sphere> teapot_sphere_buffer;
+
+    VertexBuffer<CUDA::Sphere> body_sphere_buffer;
+    Interop body_interop;
+    std::vector<CUDA::RigidBody> bodies;
 
 
     VertexBuffer<CUDA::Sphere> sphereBuffer;

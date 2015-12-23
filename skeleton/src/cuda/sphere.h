@@ -14,7 +14,7 @@ public:
     vec3_t position;
     float radius;
     vec4_t color;
-    vec3_t impulse;
+    vec3_t velocity;
     float mass;
 
     int id;

@@ -58,9 +58,9 @@ __global__ void integrateSpheres(Sphere* spheres, int numberOfSpheres, float dt)
         Sphere& s = spheres[tid];
 
 #ifdef GRAVITY
-        s.impulse  += dt * make_float3(0, -1.5, 0);
+        s.velocity  += dt * make_float3(0, -1.5, 0);
 #endif
-        s.position += dt * s.impulse;
+        s.position += dt * s.velocity;
 
     }
 

@@ -87,7 +87,7 @@ static bool triangleIntersection(Ray& ray, Triangle& tri, float maxT, Intersecti
     return false;
 }
 
-void RayTracer::fillBufferWithSpheres(MaterialMesh<VertexNT,GLuint>* input, std::vector<CUDA::Sphere>& output, float sphereRadius)
+void RayTracer::fillBufferWithSpheres(MaterialMesh<VertexNT,GLuint>* input, std::vector<CUDA::Sphere>& output, float sphereRadius, float mass)
 {
     aabb box = input->calculateAabb();
     glm::vec3 max = box.max;
@@ -142,7 +142,7 @@ void RayTracer::fillBufferWithSpheres(MaterialMesh<VertexNT,GLuint>* input, std:
                         sphere.position = glm::vec3(x, y, s);
                         sphere.radius = sphereRadius;
                         sphere.color = glm::vec4(1.f, 0.f, 0.f, 1.f);
-                        sphere.impulse = glm::vec3(0.f);
+                        sphere.velocity = glm::vec3(0.f);
                         sphere.id = -1;
                         output.push_back(sphere);
                     }
@@ -150,5 +150,12 @@ void RayTracer::fillBufferWithSpheres(MaterialMesh<VertexNT,GLuint>* input, std:
 
             }
         }
+    }
+
+    float massPerSphere = mass / (float) output.size();
+
+    for (CUDA::Sphere& s : output)
+    {
+        s.mass = massPerSphere;
     }
 }

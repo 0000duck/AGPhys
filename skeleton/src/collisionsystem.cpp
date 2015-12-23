@@ -1,9 +1,13 @@
+#define RIGIDBODY
+
 #include "collisionSystem.h"
 #include "saiga/opengl/shader/shaderLoader.h"
 #include "saiga/opengl/objloader.h"
 #include "raytracer.h"
 #include <random>
 #include <ctime>
+
+#include <glm/gtc/type_ptr.hpp>
 
 #include "cuda/timing.h"
 
@@ -32,6 +36,7 @@ void CollisionSystem::init()
     sphereShader = ShaderLoader::instance()->load<MVPShader>("particles.glsl");
 
 
+#ifndef RIGIDBODY
     //initialize spheres with some random values
     std::vector<CUDA::Sphere> spheres(sphereCount);
 
@@ -43,7 +48,7 @@ void CollisionSystem::init()
         p.radius = 0.5f;
         //p.radius = ((std::rand() % 40) + 10) / 100.f; // 0.1 - 0.5 radius
         p.color = glm::linearRand(vec4(0,0,0,1),vec4(1,1,1,1));
-        p.impulse = glm::ballRand(2.0f);
+        p.velocity = glm::ballRand(2.0f);
         p.mass = 1;
 
         p.id = i;
@@ -61,38 +66,70 @@ void CollisionSystem::init()
 
     sphere_interop.registerGLBuffer(sphereBuffer.getVBO());
 
-    initTiming();
+#else
 
-    reset();
+    ObjLoader* loader = ObjLoader::instance();
+    RayTracer* raytracer = RayTracer::instance();
 
 
     // load teapot
-    ObjLoader* loader = ObjLoader::instance();
-    RayTracer* raytracer = RayTracer::instance();
+    MaterialMesh<VertexNT,GLuint>* teapot_mesh;
     teapot_mesh = loader->loadFromFile("objs/teapot.obj", NoParams());
     teapot_mesh->createBuffers(teapot_buffer);
+
+    // create shader
     teapotShader = ShaderLoader::instance()->load<MVPShader>("object.glsl");
+
+    // sphere buffer
     std::vector<CUDA::Sphere> teapotSpheres;
-    raytracer->fillBufferWithSpheres(teapot_mesh, teapotSpheres, 0.2f);
-    teapot_sphere_buffer.set(teapotSpheres);
-    teapot_sphere_buffer.setDrawMode(GL_POINTS);
+    raytracer->fillBufferWithSpheres(teapot_mesh, teapotSpheres, 0.02f, 100.f);
+
+    // load to vertex buffer
+    body_sphere_buffer.set(teapotSpheres);
+    body_sphere_buffer.setDrawMode(GL_POINTS);
+
+    // interops
+    body_interop.registerGLBuffer(body_sphere_buffer.getVBO());
+
+    // rigid body buffer
+    bodies.push_back(CUDA::RigidBody());
+    bodies[0].linearVelocity = vec3(0.f);
+    bodies[0].angularVelocity = vec3(0.f);
+    bodies[0].mass = 100.0f;
+    bodies[0].numberOfSpheres = teapotSpheres.size();
+    bodies[0].position = vec3(0.0f, 12.0f, 0.0f);
+    bodies[0].rotation = quat();
+
+    CUDA::initRigidBodies(&bodies[0], bodies.size());
+
+#endif
+
+    initTiming();
+
+    reset();
 }
 
 void CollisionSystem::shutdown()
 {
     shutdownTiming();
+#ifdef RIGIDBODY
+    CUDA::shutdownRigidBodies();
+#endif
 }
 
 void CollisionSystem::reset()
 {
+#ifndef RIGIDBODY
     sphere_interop.map();
     void* spheres_ptr = sphere_interop.getDevicePtr();
     CUDA::resetSpheres(static_cast<CUDA::Sphere*>(spheres_ptr), sphereCount, 9, 9, glm::vec3(-8.f, 1.f, -8.f), 2);
     sphere_interop.unmap();
+#endif
 }
 
 void CollisionSystem::update(float dt, CUDA::Plane* planes, int planeCount)
 {
+#ifndef RIGIDBODY
     sphere_interop.map();
     void* spheres = sphere_interop.getDevicePtr();
 
@@ -113,26 +150,45 @@ void CollisionSystem::update(float dt, CUDA::Plane* planes, int planeCount)
             break;
     }
 
-
-
     sphere_interop.unmap();
+#else
 
+    body_interop.map();
+    CUDA::updateRigidBodies(static_cast<CUDA::Sphere*>(body_interop.getDevicePtr()), dt);
+    body_interop.unmap();
 
+#endif
 }
 
 void CollisionSystem::render(Camera *cam)
 {
     //render the particles from the viewpoint of the camera
     sphereShader->bind();
+#ifndef RIGIDBODY
     sphereShader->uploadAll(mat4(),cam->view,cam->proj);
-    //sphereBuffer.bindAndDraw();
-    teapot_sphere_buffer.bindAndDraw();
-    sphereShader->unbind();
+    sphereBuffer.bindAndDraw();
+#else
+    std::vector<glm::vec3> pos(bodies.size());
+    std::vector<glm::quat> rot(bodies.size());
 
-    teapotShader->bind();
-    teapotShader->uploadAll(mat4(), cam->view, cam->proj);
-    //teapot_buffer.bindAndDraw();
-    teapotShader->unbind();
+    CUDA::getOrientationData(pos, rot);
+
+    for (int i = 0; i < bodies.size(); ++i)
+    {
+        mat4 m;
+        m = glm::translate(m, pos[i]);
+        m = m * glm::mat4_cast(rot[i]);
+
+        sphereShader->uploadAll(m,cam->view,cam->proj);
+        body_sphere_buffer.bindAndDraw();
+
+        teapotShader->bind();
+        teapotShader->uploadAll(m, cam->view, cam->proj);
+        //teapot_buffer.bindAndDraw();
+        teapotShader->unbind();
+    }
+
+#endif
 }
 
 void CollisionSystem::keyPressed(int key)
@@ -140,10 +196,8 @@ void CollisionSystem::keyPressed(int key)
     switch(key)
     {
         case SDLK_r:
-        {
             reset();
             break;
-        }
 
         case SDLK_1:
             method = BRUTE_FORCE;
