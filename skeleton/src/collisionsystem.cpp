@@ -81,11 +81,12 @@ void CollisionSystem::init()
     teapotShader = ShaderLoader::instance()->load<MVPShader>("object.glsl");
 
     // sphere buffer
-    std::vector<CUDA::Sphere> teapotSpheres;
-    raytracer->fillBufferWithSpheres(teapot_mesh, teapotSpheres, 0.02f, 100.f);
+    std::vector<CUDA::Sphere> spheres;
+    //raytracer->fillBufferWithSpheres(spheres, teapotSpheres, 0.02f, 100.f);
+    raytracer->fillBufferWithSpheres(spheres, 0.5f, 27.f);
 
     // load to vertex buffer
-    body_sphere_buffer.set(teapotSpheres);
+    body_sphere_buffer.set(spheres);
     body_sphere_buffer.setDrawMode(GL_POINTS);
 
     // interops
@@ -96,9 +97,10 @@ void CollisionSystem::init()
     bodies[0].linearVelocity = vec3(0.f);
     bodies[0].angularVelocity = vec3(0.f);
     bodies[0].mass = 100.0f;
-    bodies[0].numberOfSpheres = teapotSpheres.size();
-    bodies[0].position = vec3(0.0f, 12.0f, 0.0f);
+    bodies[0].numberOfSpheres = spheres.size();
+    bodies[0].position = vec3(0.0f, 2.0f, 0.0f);
     bodies[0].rotation = quat();
+    bodies[0].torque = vec3(0.f, 0.0001f, 0.f);
 
     CUDA::initRigidBodies(&bodies[0], bodies.size());
 
@@ -178,6 +180,9 @@ void CollisionSystem::render(Camera *cam)
         mat4 m;
         m = glm::translate(m, pos[i]);
         m = m * glm::mat4_cast(rot[i]);
+
+        //std::cout << pos[i].x << " " << pos[i].y << " " << pos[i].z << std::endl;
+        //std::cout << rot[i].x << " " << rot[i].y << " " << rot[i].z << " " << rot[i].w << std::endl;
 
         sphereShader->uploadAll(m,cam->view,cam->proj);
         body_sphere_buffer.bindAndDraw();

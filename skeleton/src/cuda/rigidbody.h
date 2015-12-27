@@ -19,6 +19,9 @@ public:
     float  mass;
     vec3_t linearVelocity;
     vec3_t angularVelocity;
+    vec3_t torque;
+
+    float  invInertia[3][3];
 
     int    numberOfSpheres;
 

@@ -159,3 +159,24 @@ void RayTracer::fillBufferWithSpheres(MaterialMesh<VertexNT,GLuint>* input, std:
         s.mass = massPerSphere;
     }
 }
+
+void RayTracer::fillBufferWithSpheres(std::vector<CUDA::Sphere> &output, float sphereRadius, float mass)
+{
+    for (float y = -sphereRadius - sphereRadius; y <= sphereRadius + sphereRadius; y += sphereRadius * 2.f)
+    {
+        for (float z = -sphereRadius - sphereRadius; z <= sphereRadius + sphereRadius; z += sphereRadius * 2.f)
+        {
+            for (float x = -sphereRadius - sphereRadius; x <= sphereRadius + sphereRadius; x += sphereRadius * 2.f)
+            {
+                CUDA::Sphere sphere;
+                sphere.position = glm::vec3(x, y, z);
+                sphere.radius = sphereRadius;
+                sphere.color = glm::vec4(1.f, 0.f, 0.f, 1.f);
+                sphere.velocity = glm::vec3(0.f);
+                sphere.mass = mass / 27.f;
+                sphere.id = -1;
+                output.push_back(sphere);
+            }
+        }
+    }
+}
