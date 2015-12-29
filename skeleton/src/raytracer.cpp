@@ -87,7 +87,7 @@ static bool triangleIntersection(Ray& ray, Triangle& tri, float maxT, Intersecti
     return false;
 }
 
-void RayTracer::fillBufferWithSpheres(MaterialMesh<VertexNT,GLuint>* input, std::vector<CUDA::Sphere>& output, float sphereRadius, float mass)
+int RayTracer::fillBufferWithSpheres(MaterialMesh<VertexNT,GLuint>* input, std::vector<CUDA::Sphere>& output, float sphereRadius, float mass)
 {
     aabb box = input->calculateAabb();
     glm::vec3 max = box.max;
@@ -99,11 +99,12 @@ void RayTracer::fillBufferWithSpheres(MaterialMesh<VertexNT,GLuint>* input, std:
 
     std::cout << box << std::endl;
 
+    int count = 0;
+
     for (float x = min.x + sphereRadius; x < max.x; x += sphereRadius * 2.f)
     {
         for (float y = min.y + sphereRadius; y < max.y; y += sphereRadius * 2.f)
         {
-            //std::cout << x << " " << y << std::endl;
             Ray ray;
             ray.origin  = glm::vec3(x, y, min.z);
             ray.dir     = glm::vec3(0.f, 0.f, 1);
@@ -145,6 +146,7 @@ void RayTracer::fillBufferWithSpheres(MaterialMesh<VertexNT,GLuint>* input, std:
                         sphere.velocity = glm::vec3(0.f);
                         sphere.id = -1;
                         output.push_back(sphere);
+                        count++;
                     }
                 }
 
@@ -152,21 +154,23 @@ void RayTracer::fillBufferWithSpheres(MaterialMesh<VertexNT,GLuint>* input, std:
         }
     }
 
-    float massPerSphere = mass / (float) output.size();
+    float massPerSphere = mass / (float) count;
 
     for (CUDA::Sphere& s : output)
     {
         s.mass = massPerSphere;
     }
+
+    return count;
 }
 
-void RayTracer::fillBufferWithSpheres(std::vector<CUDA::Sphere> &output, float sphereRadius, float mass)
+int RayTracer::fillBufferWithSpheres(std::vector<CUDA::Sphere> &output, float sphereRadius, float mass)
 {
-    for (float y = -sphereRadius - sphereRadius; y <= sphereRadius + sphereRadius; y += sphereRadius * 2.f)
+    for (float y = -2.f * sphereRadius; y <= 2.f * sphereRadius; y += sphereRadius * 2.f)
     {
-        for (float z = -sphereRadius - sphereRadius; z <= sphereRadius + sphereRadius; z += sphereRadius * 2.f)
+        for (float z = -2.f * sphereRadius; z <= 2.f * sphereRadius; z += sphereRadius * 2.f)
         {
-            for (float x = -sphereRadius - sphereRadius; x <= sphereRadius + sphereRadius; x += sphereRadius * 2.f)
+            for (float x = -2.f *sphereRadius; x <= 2.f * sphereRadius; x += sphereRadius * 2.f)
             {
                 CUDA::Sphere sphere;
                 sphere.position = glm::vec3(x, y, z);
@@ -179,4 +183,5 @@ void RayTracer::fillBufferWithSpheres(std::vector<CUDA::Sphere> &output, float s
             }
         }
     }
+    return 27;
 }

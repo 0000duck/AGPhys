@@ -30,11 +30,10 @@ public:
 
 }ATTRIBUTES;
 
-void initRigidBodies(RigidBody* host_bodies, int size);
+void initRigidBodies(RigidBody* host_bodies, int size, int planeCount);
 void shutdownRigidBodies();
 void getOrientationData(std::vector<glm::vec3>& pos, std::vector<glm::quat>& rot);
 
-
-void updateRigidBodies(Sphere* spheres, float dt);
+void updateRigidBodies(Sphere* spheres, int numberOfSpheres, Plane *planes, int numberOfPlanes, float dt);
 
 }

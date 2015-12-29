@@ -42,7 +42,7 @@ public:
     CollisionSystem();
     ~CollisionSystem();
 
-    void init();
+    void init(int numberOfPlanes);
     void shutdown();
 
     void update(float dt, CUDA::Plane* planes, int planeCount);

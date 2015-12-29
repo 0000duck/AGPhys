@@ -10,8 +10,8 @@ class RayTracer : public Singleton<RayTracer>
     friend class Singleton<RayTracer>;
 
 public:
-    void fillBufferWithSpheres(MaterialMesh<VertexNT,GLuint>* input, std::vector<CUDA::Sphere>& output, float sphereRadius, float mass);
-    void fillBufferWithSpheres(std::vector<CUDA::Sphere>& output, float sphereRadius, float mass);
+    int fillBufferWithSpheres(MaterialMesh<VertexNT,GLuint>* input, std::vector<CUDA::Sphere>& output, float sphereRadius, float mass);
+    int fillBufferWithSpheres(std::vector<CUDA::Sphere>& output, float sphereRadius, float mass);
 
 private:
 

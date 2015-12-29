@@ -17,23 +17,32 @@
 
 
 #include "rigidbody.h"
+#include "collision.h"
 
 namespace CUDA
 {
 
-RigidBody* dev_ptr;
+RigidBody* body_ptr;
+int* grid_ptr;
 int numberOfBodies;
+int numberOfPlanes;
 
-void initRigidBodies(RigidBody* host_bodies, int size)
+void initRigidBodies(RigidBody* host_bodies, int size, int planeCount)
 {
-    cudaMalloc(&dev_ptr, sizeof(RigidBody) * size);
-    cudaMemcpy(dev_ptr, host_bodies, sizeof(RigidBody) * size, cudaMemcpyHostToDevice);
+    cudaMalloc(&body_ptr, sizeof(RigidBody) * size);
+    cudaMemcpy(body_ptr, host_bodies, sizeof(RigidBody) * size, cudaMemcpyHostToDevice);
     numberOfBodies = size;
+    numberOfPlanes = planeCount;
+
+    // init grid
+    int gridSize = numberOfBodies * (numberOfBodies + numberOfPlanes);
+    cudaMalloc(&grid_ptr, sizeof(int) * gridSize);
 }
 
 void shutdownRigidBodies()
 {
-    cudaFree(dev_ptr);
+    cudaFree(body_ptr);
+    cudaFree(grid_ptr);
 }
 
 __global__ void getPosAndRot(RigidBody* bodies, vec3_t* pos_ptr, quat_t* rot_ptr, int numberOfBodies)
@@ -58,7 +67,7 @@ void getOrientationData(std::vector<glm::vec3>& pos, std::vector<glm::quat>& rot
     cudaMalloc(&pos_ptr, sizeof(vec3_t) * numberOfBodies);
     cudaMalloc(&rot_ptr, sizeof(quat_t) * numberOfBodies);
 
-    getPosAndRot<<<blocks, threadsPerBlock>>>(dev_ptr, pos_ptr, rot_ptr, numberOfBodies);
+    getPosAndRot<<<blocks, threadsPerBlock>>>(body_ptr, pos_ptr, rot_ptr, numberOfBodies);
 
     cudaMemcpy(&pos[0], pos_ptr, sizeof(vec3_t) * numberOfBodies, cudaMemcpyDeviceToHost);
     cudaMemcpy(&rot[0], rot_ptr, sizeof(quat_t) * numberOfBodies, cudaMemcpyDeviceToHost);
@@ -72,9 +81,11 @@ __host__ __device__ void quatToRot3(quat_t& quat, float rot[3][3])
     rot[0][0] = 1.f - 2.f * quat.y * quat.y - 2.f * quat.z * quat.z;
     rot[0][1] = 2.f * quat.x * quat.y - 2.f * quat.w * quat.z;
     rot[0][2] = 2.f * quat.x * quat.z + 2.f * quat.w * quat.y;
+
     rot[1][0] = 2.f * quat.x * quat.y + 2.f * quat.w * quat.z;
     rot[1][1] = 1.f - 2.f * quat.x * quat.x - 2.f * quat.z * quat.z;
     rot[1][2] = 2.f * quat.y * quat.z - 2.f * quat.w * quat.x;
+
     rot[2][0] = 2.f * quat.x * quat.z - 2.f * quat.w * quat.z;
     rot[2][1] = 2.f * quat.y * quat.z + 2.f * quat.w * quat.x;
     rot[2][2] = 1.f - 2.f * quat.x * quat.x - 2.f * quat.y * quat.y;
@@ -113,7 +124,7 @@ __host__ __device__ void matTimesScalar(float m[3][3], float s)
     {
         for (int x = 0; x < 3; ++x)
         {
-            m[x][y] *= s;
+            m[y][x] *= s;
         }
     }
 }
@@ -125,23 +136,27 @@ __host__ __device__ void matTimesVec(float m[3][3], vec3_t& in, vec3_t& out)
     out.z = m[2][0] * in.x + m[2][1] * in.y + m[2][2] * in.z;
 }
 
-__global__ void updateBodies(RigidBody* bodies, int numberOfBodies, Sphere* spheres, float dt)
+__host__ __device__ void quatTimesQuat(quat_t& l, quat_t& r, quat_t& out)
+{
+    float3 v0 = make_float3(l.x, l.y, l.z);
+    float3 v1 = make_float3(r.x, r.y, r.z);
+
+    out.w = l.w * r.w - dot(v0, v1);
+    float3 v = l.w * v1 + r.w * v0 + cross(v0, v1);
+    out.x = v.x;
+    out.y = v.y;
+    out.z = v.z;
+}
+
+__global__ void updateBodies(RigidBody* bodies, int numberOfBodies, float dt)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < numberOfBodies)
     {
         RigidBody& rb = bodies[tid];
 
-        uint sphereStart = 0;
-        uint sphereEnd = 0;
-        for (int i = 0; i < tid; ++i)
-        {
-            sphereStart += bodies[i].numberOfSpheres;
-        }
-        sphereEnd = sphereStart + rb.numberOfSpheres;
-
-        rb.linearVelocity += dt * make_float3(0.0, -0.1f, 0.0f); // gravity
-        //rb.position += dt * rb.linearVelocity;
+        rb.linearVelocity += dt * make_float3(0.0, -0.05f, 0.0f); // gravity
+        rb.position += dt * rb.linearVelocity;
 
         float rot[3][3];
         quatToRot3(rb.rotation, rot);
@@ -149,10 +164,10 @@ __global__ void updateBodies(RigidBody* bodies, int numberOfBodies, Sphere* sphe
         transposeMatrix(rot, invRot);
 
 
-        // only for cube:
         float curInertia[3][3];
-        matTimesScalar(rot, 1.f/60.f);
-        matTimesMat(rot, invRot, curInertia);
+        float tmp[3][3];
+        matTimesMat(rot, rb.invInertia, tmp);
+        matTimesMat(tmp, invRot, curInertia);
 
         if (length(rb.torque) == 0.f)
             return;
@@ -160,13 +175,87 @@ __global__ void updateBodies(RigidBody* bodies, int numberOfBodies, Sphere* sphe
         // equation 5
         matTimesVec(curInertia, rb.torque, rb.angularVelocity);
         
+
         // equation 7
         float3 rotationAxis = normalize(rb.angularVelocity);
         float rotationAngle = length(rb.angularVelocity * dt);
-        quaternion<float> dq(rotationAxis * sin(rotationAngle / 2), cos(rotationAngle / 2));
+        quaternion<float> dq(rotationAxis * sin(rotationAngle / 2), sin(rotationAngle / 2));
 
         // equation 8
-        rb.rotation = dq * rb.rotation;
+        quaternion<float> newRot = dq * rb.rotation;
+        quatTimesQuat(dq, rb.rotation, newRot);
+        rb.rotation = newRot;
+    }
+}
+
+__device__ void incrementGrid(int* grid, int width, int ownID, int otherID)
+{
+    int index = width * ownID + otherID;
+    atomicAdd(&grid[index], 1);
+}
+
+__global__ void updateSpheres(RigidBody* bodies, int numberOfBodies, Sphere* spheres, int numberOfSpheres, Plane* planes, int numberOfPlanes, int* grid, float dt)
+{
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    if (tid < numberOfSpheres)
+    {
+        Sphere& sphere = spheres[tid];
+        RigidBody* rb = NULL;
+        int gridWidth = numberOfBodies + numberOfPlanes;
+
+        uint sphereSum = 0;
+        for (int r = 0; r < numberOfBodies; ++r)
+        {
+            sphereSum += bodies[r].numberOfSpheres;
+            if (tid < sphereSum)
+            {
+                // found corresponding body
+                rb = &bodies[r];
+                break;
+            }
+        }
+
+        // absolute position
+        float3 abs_pos;
+        float rot[3][3];
+        quatToRot3(rb->rotation, rot);
+        matTimesVec(rot, sphere.position, abs_pos);
+        abs_pos += rb->position;
+
+        // absolute velocity
+        float3 abs_vel = cross(rb->angularVelocity, sphere.position) + rb->linearVelocity;
+
+        float3 pos = sphere.position;
+        Sphere s = sphere;
+        s.position = abs_pos;
+        s.velocity = abs_vel;
+
+        sphere.sphereCollider = NULL;
+        sphere.planeCollider  = NULL;
+
+        // PLANE COLLISION
+        for (int p = 0; p < numberOfPlanes; ++p)
+        {
+            float penetration = collideSpherePlane(s, planes[p]);
+            if (penetration != -1.0f)
+            {
+                incrementGrid(grid, gridWidth, tid, numberOfBodies + p);
+                sphere.planeCollider = &planes[p];
+            }
+        }
+
+        // SPHERE COLLISION
+
+
+    }
+}
+
+__global__ void clearGrid(int* grid, int sizeOfGrid)
+{
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    if (tid < sizeOfGrid)
+    {
+        grid[tid] = 0;
     }
 }
 
@@ -187,7 +276,7 @@ void printMat(float m[3][3])
     {
         for (int x = 0; x < 3; ++x)
         {
-            std::cout << m[x][y] << "    ";
+            std::cout << m[y][x] << "    ";
         }
         std::cout << std::endl;
     }
@@ -198,28 +287,15 @@ void printDelim()
     std::cout << "-----------" << std::endl;
 }
 
-void updateRigidBodies(Sphere* spheres, float dt)
+void updateRigidBodies(Sphere* spheres, int numberOfSpheres, Plane* planes, int numberOfPlanes, float dt)
 {
     int threadsPerBlock = 128;
     int blocks = numberOfBodies / threadsPerBlock + 1;
-
-    updateBodies<<<blocks, threadsPerBlock>>>(dev_ptr, numberOfBodies, spheres, dt);
-
-    float m1[3][3];
-    for (int y = 0; y < 3; ++y)
-    {
-        for (int x = 0; x < 3; ++x)
-        {
-            m1[x][y] = y * 3 + x;
-        }
-    }
-    printMat(m1);
-    vec3_t v;
-    v.x = 1.f; v.y = 2.f; v.z = 3.f;
-    printVec(v);
-    vec3_t r;
-    matTimesVec(m1, v, r);
-    printVec(r);
+    updateBodies<<<blocks, threadsPerBlock>>>(body_ptr, numberOfBodies, dt);
+    blocks = (numberOfBodies * (numberOfBodies + numberOfPlanes)) / threadsPerBlock + 1;
+    clearGrid<<<blocks, threadsPerBlock>>>(grid_ptr, numberOfBodies * (numberOfBodies + numberOfPlanes));
+    blocks = numberOfSpheres / threadsPerBlock + 1;
+    updateSpheres<<<blocks, threadsPerBlock>>>(body_ptr, numberOfBodies, spheres, numberOfSpheres, planes, numberOfPlanes, grid_ptr, dt);
 }
 
 

@@ -17,6 +17,9 @@ public:
     vec3_t velocity;
     float mass;
 
+    Sphere* sphereCollider;
+    Plane*  planeCollider;
+
     int id;
     int nextInList;
 

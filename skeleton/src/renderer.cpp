@@ -72,7 +72,7 @@ void myRenderer::init()
     plane_interop.registerGLBuffer(planeBuffer.getVBO());
 
     //particleSystem.init();
-    collisionSystem.init();
+    collisionSystem.init(planeCount);
 
     cout<<"Renderer Initialized!"<<endl;
 }

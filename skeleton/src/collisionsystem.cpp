@@ -30,7 +30,7 @@ CollisionSystem::~CollisionSystem()
 {
 }
 
-void CollisionSystem::init()
+void CollisionSystem::init(int numberOfPlanes)
 {
     std::srand(std::time(NULL));
     sphereShader = ShaderLoader::instance()->load<MVPShader>("particles.glsl");
@@ -82,27 +82,42 @@ void CollisionSystem::init()
 
     // sphere buffer
     std::vector<CUDA::Sphere> spheres;
-    //raytracer->fillBufferWithSpheres(spheres, teapotSpheres, 0.02f, 100.f);
-    raytracer->fillBufferWithSpheres(spheres, 0.5f, 27.f);
+    //int count = raytracer->fillBufferWithSpheres(teapot_mesh, spheres, 0.02f, 100.f);
+    int count = raytracer->fillBufferWithSpheres(spheres, 0.5f, 100.f);
 
     // load to vertex buffer
     body_sphere_buffer.set(spheres);
     body_sphere_buffer.setDrawMode(GL_POINTS);
 
-    // interops
-    body_interop.registerGLBuffer(body_sphere_buffer.getVBO());
 
     // rigid body buffer
     bodies.push_back(CUDA::RigidBody());
     bodies[0].linearVelocity = vec3(0.f);
-    bodies[0].angularVelocity = vec3(0.f);
+    bodies[0].angularVelocity = vec3(0.f, 0.f, 0.f);
     bodies[0].mass = 100.0f;
-    bodies[0].numberOfSpheres = spheres.size();
-    bodies[0].position = vec3(0.0f, 2.0f, 0.0f);
+    bodies[0].numberOfSpheres = count;
+    bodies[0].position = vec3(0.0f, 7.0f, 0.0f);
     bodies[0].rotation = quat();
-    bodies[0].torque = vec3(0.f, 0.0001f, 0.f);
+    bodies[0].torque = vec3(8.f, 0.f, 0.f);
 
-    CUDA::initRigidBodies(&bodies[0], bodies.size());
+    for (int y = 0; y < 3; ++y)
+    {
+        for (int x = 0; x < 3; ++x)
+        {
+            bodies[0].invInertia[y][x] = 0.f;
+            if (x == y)
+            {
+                bodies[0].invInertia[y][x] = 1.f/150.f;
+            }
+        }
+    }
+
+
+    // interops
+    body_interop.registerGLBuffer(body_sphere_buffer.getVBO());
+    sphereCount = spheres.size();
+
+    CUDA::initRigidBodies(&bodies[0], bodies.size(), numberOfPlanes);
 
 #endif
 
@@ -156,7 +171,7 @@ void CollisionSystem::update(float dt, CUDA::Plane* planes, int planeCount)
 #else
 
     body_interop.map();
-    CUDA::updateRigidBodies(static_cast<CUDA::Sphere*>(body_interop.getDevicePtr()), dt);
+    CUDA::updateRigidBodies(static_cast<CUDA::Sphere*>(body_interop.getDevicePtr()), sphereCount, planes, planeCount, dt);
     body_interop.unmap();
 
 #endif
