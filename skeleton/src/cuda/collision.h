@@ -167,7 +167,12 @@ __device__ void elasticCollision(Sphere& sphere1, Sphere& sphere2, float penetra
 }
 
 
+/// ---------------------------------------------------- RIGID BODY COLLISION RESPONSE  -----------------------------------------------------
 
+__device__ void rigidBodyCollisionResponse()
+{
+
+}
 
 
 

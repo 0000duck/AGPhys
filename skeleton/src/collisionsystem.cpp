@@ -92,13 +92,13 @@ void CollisionSystem::init(int numberOfPlanes)
 
     // rigid body buffer
     bodies.push_back(CUDA::RigidBody());
-    bodies[0].linearVelocity = vec3(0.f);
+    bodies[0].linearVelocity = vec3(0.f, 0.f, 0.f);
     bodies[0].angularVelocity = vec3(0.f, 0.f, 0.f);
     bodies[0].mass = 100.0f;
     bodies[0].numberOfSpheres = count;
     bodies[0].position = vec3(0.0f, 7.0f, 0.0f);
     bodies[0].rotation = quat();
-    bodies[0].torque = vec3(8.f, 0.f, 0.f);
+    bodies[0].angularMomentum = vec3(8.f, 0.f, 0.f);
 
     for (int y = 0; y < 3; ++y)
     {

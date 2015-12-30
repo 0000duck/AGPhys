@@ -17,9 +17,10 @@ public:
     vec3_t position;
     quat_t rotation;
     float  mass;
+
     vec3_t linearVelocity;
     vec3_t angularVelocity;
-    vec3_t torque;
+    vec3_t angularMomentum;
 
     float  invInertia[3][3];
 
