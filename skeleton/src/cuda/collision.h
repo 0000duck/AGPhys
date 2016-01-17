@@ -18,7 +18,7 @@ __device__ float collideSpherePlane(Sphere& sphere, Plane& plane)
     if (dot(sphere.velocity, plane.normal) > 0)
     {
         // moving away from plane
-        return -1.0f;
+        //return -1.0f;
     }
     if (dot(plane.normal, sphere.position) <= plane.d + sphere.radius * length(plane.normal))
     {
@@ -89,9 +89,6 @@ __device__ float collideSphereSphere(Sphere& sphere1, Sphere& sphere2)
 
 /// ------------------------------------------------------ COLLISION RESPONSE  ------------------------------------------------------
 
-/*
- *
- */
 __device__ void kinematicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane, float penetration)
 {
     float3 colNormal = plane.normal;
@@ -109,21 +106,34 @@ __device__ void kinematicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& 
     sphere2.position += colNormal * 0.5 * penetration;
 }
 
-__device__ void dynamicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane, float penetration)
+__device__ void dynamicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane, float penetration, float dt)
 {
-    float3 colNormal = plane.normal;
-    float3 vRel      = dot(sphere.velocity, plane.normal) * plane.normal;
+    float invMass = 1.0 / sphere.mass;
+    float vNormal = -length(dot(sphere.velocity,plane.normal) * plane.normal);
+    float epsilon = 0.7;
+    float j = -(1+epsilon) / invMass *vNormal;
 
-    float lamda_spring  = 1;
-    float lamda_dashpot = 0.3;
-    float lamda_shear   = 0.3;
 
-    float3 f_spring  = lamda_spring * reflect(sphere.velocity, colNormal);
-    float3 f_dashpot = lamda_dashpot * vRel * sphere.mass;
-    float3 f_shear   = lamda_shear * -1.0f * (sphere.velocity - vRel) * sphere.mass;
+    float3 J = j * plane.normal;
 
-    sphere.velocity = (f_spring + f_dashpot + f_shear);
-    sphere.position += colNormal * penetration;
+
+    float l = length(sphere.velocity - (vNormal * plane.normal));
+    if (l > 0){
+        //friction
+        float mu = 0.1;
+        float3 frictionTerm = (sphere.velocity - (vNormal * plane.normal)) / l;
+
+        J -= mu * j * frictionTerm;
+    }
+
+    const float deltaT = 1.0f;
+    float3 momentum = J*deltaT;
+
+    float3 toAdd = momentum * invMass;
+
+    sphere.velocity += toAdd;
+
+    sphere.force += momentum;
 }
 
 __device__ void dynamicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sphere2, float penetration)

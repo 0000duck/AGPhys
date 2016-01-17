@@ -72,21 +72,24 @@ void myRenderer::init()
     plane_interop.registerGLBuffer(planeBuffer.getVBO());
 
     //particleSystem.init();
-    collisionSystem.init(planeCount);
+    //collisionSystem.init(planeCount);
+    cloth.init();
 
     cout<<"Renderer Initialized!"<<endl;
 }
 
 void myRenderer::shutdown()
 {
-    collisionSystem.shutdown();
+    //collisionSystem.shutdown();
+    cloth.shutdown();
 }
 
 void myRenderer::update(float dt){
     //particleSystem.update(dt);
     plane_interop.map();
     void* plane_ptr = plane_interop.getDevicePtr();
-    collisionSystem.update(dt, static_cast<CUDA::Plane*>(plane_ptr), planeCount);
+    //collisionSystem.update(dt, static_cast<CUDA::Plane*>(plane_ptr), planeCount);
+    cloth.update(dt);
     plane_interop.unmap();
 }
 
@@ -109,7 +112,8 @@ void myRenderer::render(Camera *cam)
     gridShader->unbind();
 
     //particleSystem.render(cam);
-    collisionSystem.render(cam);
+    //collisionSystem.render(cam);
+    cloth.render(cam);
 }
 
 

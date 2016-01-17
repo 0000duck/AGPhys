@@ -20,6 +20,7 @@ public:
 
     vec3_t linearVelocity;
     vec3_t angularVelocity;
+    vec3_t linearMomentum;
     vec3_t angularMomentum;
 
     float  invInertia[3][3];
@@ -29,7 +30,7 @@ public:
     RigidBody(){}
 
 
-}ATTRIBUTES;
+} ATTRIBUTES;
 
 void initRigidBodies(RigidBody* host_bodies, int size, int planeCount);
 void shutdownRigidBodies();

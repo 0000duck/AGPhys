@@ -155,61 +155,54 @@ __global__ void updateBodies(RigidBody* bodies, int numberOfBodies, float dt)
     {
         RigidBody& rb = bodies[tid];
 
-        rb.linearVelocity += dt * make_float3(0.0, -0.5f, 0.0f); // gravity
-        rb.position += dt * rb.linearVelocity;
+        rb.position += (rb.linearVelocity / rb.mass) * dt;
+        rb.linearVelocity += dt * make_float3(0.0, -1.5f, 0.0f); // gravity
+
+
+        if (length(rb.angularMomentum) == 0.f)
+            return;
 
         float rot[3][3];
         quatToRot3(rb.rotation, rot);
         float invRot[3][3];
         transposeMatrix(rot, invRot);
 
-
+        // equation 6
         float curInertia[3][3];
         float tmp[3][3];
         matTimesMat(rot, rb.invInertia, tmp);
         matTimesMat(tmp, invRot, curInertia);
 
-        if (length(rb.angularMomentum) == 0.f)
-            return;
-
         // equation 5
         matTimesVec(curInertia, rb.angularMomentum, rb.angularVelocity);
         
-
         // equation 7
         float3 rotationAxis = normalize(rb.angularVelocity);
         float rotationAngle = length(rb.angularVelocity * dt);
-        quaternion<float> dq(rotationAxis * cos(rotationAngle / 2), sin(rotationAngle / 2)); // sin cos
+        quaternion<float> dq(rotationAxis, rotationAngle);
 
         // equation 8
         quaternion<float> newRot = dq * rb.rotation;
-        quatTimesQuat(dq, rb.rotation, newRot);
         rb.rotation = newRot;
     }
 }
 
-__device__ void incrementGrid(int* grid, int width, int ownID, int otherID)
+__device__ inline void incrementGrid(int* grid, int width, int ownID, int otherID)
 {
     int index = width * ownID + otherID;
     atomicAdd(&grid[index], 1);
 }
 
-__device__ float3 getAbsPosition(RigidBody& rb, Sphere& sphere)
+__device__ inline void getAbsPositionAndVelocity(RigidBody& rb, Sphere& sphere, float3& pos, float3& vel)
 {
     float3 abs_pos;
     float rot[3][3];
     quatToRot3(rb.rotation, rot);
     matTimesVec(rot, sphere.position, abs_pos);
-    abs_pos += rb.position;
-    return abs_pos;
-}
-
-__device__ float3 getAbsVelocity(RigidBody& rb, Sphere& sphere)
-{
-    float3 ang = cross(rb.angularVelocity, sphere.position);
+    float3 ang = cross(rb.angularVelocity, abs_pos);
     float3 lin = rb.linearVelocity;
-    float3 abs_vel = ang / 10 + lin;
-    return abs_vel;
+    vel = ang + lin;
+    pos = abs_pos + rb.position;
 }
 
 __global__ void collisionDetection(RigidBody* bodies, int numberOfBodies, Sphere* spheres, int numberOfSpheres, Plane* planes, int numberOfPlanes, int* grid)
@@ -236,11 +229,11 @@ __global__ void collisionDetection(RigidBody* bodies, int numberOfBodies, Sphere
         Sphere& sphere = spheres[tid];
         RigidBody& rb = bodies[rb_ID];
 
-        // absolute position
-        float3 abs_pos = getAbsPosition(rb, sphere);
+        sphere.force = make_float3(0.0);
 
-        // absolute velocity
-        float3 abs_vel = getAbsVelocity(rb, sphere);
+        // absolute position & velocity
+        float3 abs_pos, abs_vel;
+        getAbsPositionAndVelocity(rb, sphere, abs_pos, abs_vel);
 
         Sphere s = sphere;
         s.position = abs_pos;
@@ -257,10 +250,12 @@ __global__ void collisionDetection(RigidBody* bodies, int numberOfBodies, Sphere
             {
                 incrementGrid(grid, gridWidth, rb_ID, numberOfBodies + p);
                 sphere.planeCollider = p;
+                rb.linearVelocity = make_float3(0.f);
+                rb.angularMomentum = make_float3(0.f);
             }
         }
 
-        // SPHERE COLLISION - tmp brute force
+        // SPHERE COLLISION - brute force for now
         for (int s = 0; s < numberOfSpheres; ++s)
         {
 
@@ -305,15 +300,12 @@ __global__ void collisionResponse(RigidBody* bodies, int numberOfBodies, Sphere*
             }
         }
 
-
         Sphere& sphere = spheres[tid];
         RigidBody& rb = bodies[rb_ID];
 
-        // absolute position
-        float3 abs_pos = getAbsPosition(rb, sphere);
-
-        // absolute velocity
-        float3 abs_vel = getAbsVelocity(rb, sphere);
+        // absolute position & velocity
+        float3 abs_pos, abs_vel;
+        getAbsPositionAndVelocity(rb, sphere, abs_pos, abs_vel);
 
         if (sphere.planeCollider != -1)
         {
@@ -323,17 +315,34 @@ __global__ void collisionResponse(RigidBody* bodies, int numberOfBodies, Sphere*
             int numberOfCollisions = grid[rb_ID * gridWidth + numberOfBodies + sphere.planeCollider];
             if (numberOfCollisions != 0)
             {
-                Sphere s = sphere;
-                s.position = abs_pos;
-                s.velocity = abs_vel;
-                s.mass = rb.mass / numberOfCollisions;
+                float mass = rb.mass / numberOfCollisions;
+                float vNormal = -length(dot(abs_vel,plane.normal) * plane.normal);
+                float epsilon = 0.1;
+                float j = -(1+epsilon) * mass *vNormal;
 
-                kinematicCollisionResponseSpherePlane(s, plane, 1.f);
 
-                float3 force = s.velocity / dt;
-                float3 angularMomentum = cross(sphere.position, force);
-                atomicAddAngularMomentum(rb, angularMomentum);
-                atomicAddLinearVelocity(rb, s.velocity / 1.5);
+
+                float3 J = j * plane.normal;
+
+
+                float l = length(abs_vel - (vNormal * plane.normal));
+                if (l > 0){
+                    //friction
+                    float mu = 0.1;
+                    float3 frictionTerm = (abs_vel - (vNormal * plane.normal)) / l;
+
+                    J -= mu * j * frictionTerm;
+
+                }
+
+                const float deltaT = 1.0f;
+                float3 momentum = J*deltaT;
+
+                float3 toAdd = momentum ;
+
+    //            particle.velocity += toAdd;
+
+                sphere.force += toAdd;
             }
         }
 
@@ -341,6 +350,14 @@ __global__ void collisionResponse(RigidBody* bodies, int numberOfBodies, Sphere*
         {
             // SPHERE RESPONSE
         }
+
+        float3 linearForce = sphere.force;
+        float3 torque = 0.1*cross(sphere.position, linearForce);
+
+
+        //TODO use reduce
+        atomicAddLinearVelocity(rb, linearForce);
+        atomicAddAngularMomentum(rb, torque);
 
     }
 }
@@ -392,6 +409,7 @@ void updateRigidBodies(Sphere* spheres, int numberOfSpheres, Plane* planes, int 
     blocks = numberOfSpheres / threadsPerBlock + 1;
     collisionDetection<<<blocks, threadsPerBlock>>>(body_ptr, numberOfBodies, spheres, numberOfSpheres, planes, numberOfPlanes, grid_ptr);
     collisionResponse<<<blocks, threadsPerBlock>>>(body_ptr, numberOfBodies, spheres, numberOfSpheres, planes, numberOfPlanes, grid_ptr, dt);
+
 }
 
 

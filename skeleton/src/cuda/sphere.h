@@ -16,6 +16,7 @@ public:
     vec4_t color;
     vec3_t velocity;
     float mass;
+    vec3_t force;
 
     int sphereCollider;
     int planeCollider;

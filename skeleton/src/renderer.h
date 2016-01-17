@@ -29,6 +29,7 @@ public:
     MVPColorShader* gridShader;
     ParticleSystem particleSystem;
     CollisionSystem collisionSystem;
+    Cloth cloth;
 
     Interop plane_interop;
 

@@ -1,5 +1,3 @@
-#define RIGIDBODY
-
 #include "collisionSystem.h"
 #include "saiga/opengl/shader/shaderLoader.h"
 #include "saiga/opengl/objloader.h"
@@ -8,6 +6,8 @@
 #include <ctime>
 
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/string_cast.hpp>
+#include <glm/ext.hpp>
 
 #include "cuda/timing.h"
 
@@ -49,7 +49,8 @@ void CollisionSystem::init(int numberOfPlanes)
         //p.radius = ((std::rand() % 40) + 10) / 100.f; // 0.1 - 0.5 radius
         p.color = glm::linearRand(vec4(0,0,0,1),vec4(1,1,1,1));
         p.velocity = glm::ballRand(2.0f);
-        p.mass = 1;
+        p.mass = 30;
+        p.force = vec3();
 
         p.id = i;
         p.nextInList = -1;
@@ -82,7 +83,11 @@ void CollisionSystem::init(int numberOfPlanes)
 
     // sphere buffer
     std::vector<CUDA::Sphere> spheres;
-    //int count = raytracer->fillBufferWithSpheres(teapot_mesh, spheres, 0.02f, 100.f);
+
+    // TEAPOT
+    //int count = raytracer->fillBufferWithSpheres(teapot_mesh, spheres, 0.05f, 100.f);
+
+    // CUBE
     int count = raytracer->fillBufferWithSpheres(spheres, 0.5f, 100.f);
 
     // load to vertex buffer
@@ -94,12 +99,14 @@ void CollisionSystem::init(int numberOfPlanes)
     bodies.push_back(CUDA::RigidBody());
     bodies[0].linearVelocity = vec3(0.f, 0.f, 0.f);
     bodies[0].angularVelocity = vec3(0.f, 0.f, 0.f);
-    bodies[0].mass = 100.0f;
+    bodies[0].mass = count;
     bodies[0].numberOfSpheres = count;
     bodies[0].position = vec3(0.0f, 7.0f, 0.0f);
     bodies[0].rotation = quat();
-    bodies[0].angularMomentum = vec3(8.f, 0.f, 0.f);
+    bodies[0].angularMomentum = vec3(15.f, 0.f, 0.f);
 
+
+    // inertia tensor for a cube
     for (int y = 0; y < 3; ++y)
     {
         for (int x = 0; x < 3; ++x)
@@ -190,7 +197,7 @@ void CollisionSystem::render(Camera *cam)
 
     CUDA::getOrientationData(pos, rot);
 
-    for (int i = 0; i < bodies.size(); ++i)
+    for (uint i = 0; i < bodies.size(); ++i)
     {
         mat4 m;
         m = glm::translate(m, pos[i]);
@@ -199,13 +206,18 @@ void CollisionSystem::render(Camera *cam)
         //std::cout << pos[i].x << " " << pos[i].y << " " << pos[i].z << std::endl;
         //std::cout << rot[i].x << " " << rot[i].y << " " << rot[i].z << " " << rot[i].w << std::endl;
 
-        sphereShader->uploadAll(m,cam->view,cam->proj);
-        body_sphere_buffer.bindAndDraw();
-
-        teapotShader->bind();
-        teapotShader->uploadAll(m, cam->view, cam->proj);
-        //teapot_buffer.bindAndDraw();
-        teapotShader->unbind();
+        if (method == SPHERES)
+        {
+            sphereShader->uploadAll(m,cam->view,cam->proj);
+            body_sphere_buffer.bindAndDraw();
+        }
+        else if (method == TRIANGLE_MESH)
+        {
+            teapotShader->bind();
+            teapotShader->uploadAll(m, cam->view, cam->proj);
+            teapot_buffer.bindAndDraw();
+            teapotShader->unbind();
+        }
     }
 
 #endif
@@ -219,6 +231,14 @@ void CollisionSystem::keyPressed(int key)
             reset();
             break;
 
+#ifdef RIGIDBODY
+        case SDLK_1:
+            method = TRIANGLE_MESH;
+            break;
+        case SDLK_2:
+            method = SPHERES;
+            break;
+#else
         case SDLK_1:
             method = BRUTE_FORCE;
             std::cout << "\n Switched to brute-force method" << std::endl;
@@ -236,6 +256,7 @@ void CollisionSystem::keyPressed(int key)
             std::cout << "\n Switched to linked cell method" << std::endl;
             reset();
             break;
+#endif
     }
 }
 
@@ -243,6 +264,74 @@ void CollisionSystem::keyReleased(int key)
 {
 
 }
+
+
+
+
+void Cloth::init()
+{
+    m = 50;
+    n = 50;
+    float springLength = 1.5f;
+    glm::vec3 corner(-25.f, 10.f, -25.f);
+
+    numberOfSpheres = m * n;
+    std::vector<CUDA::Sphere> spheres(numberOfSpheres);
+    for (int i = 0; i < numberOfSpheres; ++i)
+    {
+        CUDA::Sphere& s = spheres[i];
+        s.mass = 1.f;
+        s.radius = 0.5f;
+        s.color = glm::vec4(1.f, 0.f, 0.f, 1.f);
+        s.force = glm::vec3(0.f);
+        s.id = i;
+        s.velocity = glm::vec3(0.f);
+
+        int xPos = i % n;
+        int zPos = (i - xPos) / n;
+        s.position = glm::vec3(xPos * springLength + corner.x, corner.y, zPos * springLength + corner.z);
+
+        std::cout << "Sphere " << i << ": " << s.position.x << ", " << s.position.z << std::endl;
+    }
+
+    // test
+    //spheres[0].position.x -= 0.5f;
+
+    sphereBuffer.set(spheres);
+    sphereBuffer.setDrawMode(GL_POINTS);
+    sphere_interop.registerGLBuffer(sphereBuffer.getVBO());
+    sphereShader = ShaderLoader::instance()->load<MVPShader>("particles.glsl");
+
+    cudaCloth.init(m, n, springLength);
+
+}
+
+void Cloth::shutdown()
+{
+    cudaCloth.shutdown();
+}
+
+void Cloth::update(float dt)
+{
+    glm::vec4 fixated;
+    fixated.x = 0;
+    fixated.y = n-1;
+    fixated.z = (m-1) * n;
+    fixated.w = (m-1) * n + (n-1);
+
+    sphere_interop.map();
+    cudaCloth.update(static_cast<CUDA::Sphere*>(sphere_interop.getDevicePtr()), numberOfSpheres, dt, fixated);
+    sphere_interop.unmap();
+}
+
+void Cloth::render(Camera *cam)
+{
+    sphereShader->bind();
+    sphereShader->uploadAll(mat4(), cam->view, cam->proj);
+    sphereBuffer.bindAndDraw();
+    sphereShader->unbind();
+}
+
 
 
 template<>

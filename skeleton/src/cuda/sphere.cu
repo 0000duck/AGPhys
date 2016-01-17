@@ -1,4 +1,4 @@
-#define KINEMATIC
+//#define KINEMATIC
 #define GRAVITY
 
 #include <cstdlib>
@@ -57,16 +57,16 @@ __global__ void integrateSpheres(Sphere* spheres, int numberOfSpheres, float dt)
     {
         Sphere& s = spheres[tid];
 
+        s.position += dt * s.velocity;
 #ifdef GRAVITY
         s.velocity  += dt * make_float3(0, -1.5, 0);
 #endif
-        s.position += dt * s.velocity;
 
     }
 
 }
 
-__global__ void collidePlanes(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes)
+__global__ void collidePlanes(Sphere* spheres, Plane* planes, int numberOfSpheres, int numberOfPlanes, float dt)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < numberOfSpheres)
@@ -84,7 +84,7 @@ __global__ void collidePlanes(Sphere* spheres, Plane* planes, int numberOfSphere
 #ifdef KINEMATIC
                 kinematicCollisionResponseSpherePlane(sphere, plane, penetration);
 #else
-                dynamicCollisionResponseSpherePlane(sphere, plane, penetration);
+                dynamicCollisionResponseSpherePlane(sphere, plane, penetration, dt);
 #endif
             }
         }
@@ -373,7 +373,7 @@ void updateAllSpheresBruteForce(Sphere* spheres, Plane* planes, int numberOfSphe
     startTiming();
 
     integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt);
-    collidePlanes<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes);
+    collidePlanes<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes, dt);
     collideSpheresBruteForce<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres);
 
     float time = endTiming();
@@ -403,7 +403,7 @@ void updateAllSpheresSortAndSweep(Sphere* spheres, Plane* planes, int numberOfSp
     startTiming();
 
     integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt);
-    collidePlanes<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes);
+    collidePlanes<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes, dt);
 
     thrust::device_vector<AxisProjection> projectionVector(numberOfSpheres * 2);
 
@@ -444,7 +444,7 @@ void updateAllSpheresLinkedCell(Sphere* spheres, Plane* planes, int numberOfSphe
     startTiming();
 
     integrateSpheres<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt);
-    collidePlanes<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes);
+    collidePlanes<<<blocks, threadsPerBlock>>>(spheres, planes, numberOfSpheres, numberOfPlanes, dt);
 
     // create 3d grid
     glm::vec3 numberOfCells = dim_colDomain / (maxRadius * 2);
