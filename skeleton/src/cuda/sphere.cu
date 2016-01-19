@@ -1,4 +1,4 @@
-//#define KINEMATIC
+#define KINEMATIC
 #define GRAVITY
 
 #include <cstdlib>

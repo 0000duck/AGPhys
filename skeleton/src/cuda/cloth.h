@@ -29,7 +29,7 @@ class Cloth
 public:
     void init(int m, int n, float springLength);
     void shutdown();
-    void update(Sphere *spheres, int numberOfSpheres, Plane* planes, int numberOfPlanes, float dt, glm::vec4 fixated = glm::vec4(-1));
+    void update(Sphere *spheres, int numberOfSpheres, Plane* planes, int numberOfPlanes, Sphere* colliders, int numberOfColliders, float dt, glm::vec4 fixated = glm::vec4(-1));
 
 private:
     Spring* dev_springs;

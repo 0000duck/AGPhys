@@ -62,10 +62,34 @@ __device__ void collideWithPlanes(Sphere& sphere, Plane* planes, int numberOfPla
             dynamicCollisionResponseSpherePlane(sphere, plane, penetration, dt);
         }
     }
-
 }
 
-__global__ void integrateMassPoints(Sphere* spheres, int numberOfSpheres, Plane* planes, int numberOfPlanes, float dt, int fixated0, int fixated1, int fixated2, int fixated3)
+__device__ void collideWithSpheres(Sphere& sphere, Sphere* colliders, int numberOfColliders)
+{
+    float max = -1.0f;
+    Sphere* maxCollider = NULL;
+    for (int s = 0; s < numberOfColliders; ++s)
+    {
+        Sphere& collider = colliders[s];
+        float penetration = collideSphereSphere(sphere, collider);
+
+        if (penetration > max)
+        {
+            maxCollider = &collider;
+            max = penetration;
+        }
+    }
+
+    if (max > -1.0f)
+    {
+        elasticCollision(sphere, *maxCollider, max);
+        sphere.velocity *= 0.5f;
+        maxCollider->velocity *= 0.5f;
+    }
+}
+
+__global__ void integrateMassPoints(Sphere* spheres, int numberOfSpheres, Plane* planes, int numberOfPlanes, Sphere* colliders, int numberOfColliders,
+                                    float dt, int fixated0, int fixated1, int fixated2, int fixated3)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < numberOfSpheres)
@@ -85,7 +109,7 @@ __global__ void integrateMassPoints(Sphere* spheres, int numberOfSpheres, Plane*
         }
 
         collideWithPlanes(s, planes, numberOfPlanes, dt);
-
+        collideWithSpheres(s, colliders, numberOfColliders);
     }
 }
 
@@ -191,13 +215,13 @@ void Cloth::shutdown()
     cudaFree(dev_springs);
 }
 
-void Cloth::update(Sphere* spheres, int numberOfSpheres, Plane *planes, int numberOfPlanes, float dt, glm::vec4 fixated)
+void Cloth::update(Sphere* spheres, int numberOfSpheres, Plane *planes, int numberOfPlanes, Sphere *colliders, int numberOfColliders, float dt, glm::vec4 fixated)
 {
     int threadsPerBlock = 128;
     int blocks = numberOfSpheres / threadsPerBlock + 1;
 
     // INTEGRATE
-    integrateMassPoints<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, planes, numberOfPlanes, dt, fixated.x, fixated.y, fixated.z, fixated.w);
+    integrateMassPoints<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, planes, numberOfPlanes, colliders, numberOfColliders, dt, fixated.x, fixated.y, fixated.z, fixated.w);
 
 
     //resetForces<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres);

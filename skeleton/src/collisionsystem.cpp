@@ -146,7 +146,7 @@ void CollisionSystem::reset()
 #ifndef RIGIDBODY
     sphere_interop.map();
     void* spheres_ptr = sphere_interop.getDevicePtr();
-    CUDA::resetSpheres(static_cast<CUDA::Sphere*>(spheres_ptr), sphereCount, 9, 9, glm::vec3(-8.f, 1.f, -8.f), 2);
+    //CUDA::resetSpheres(static_cast<CUDA::Sphere*>(spheres_ptr), sphereCount, 9, 9, glm::vec3(-8.f, 1.f, -8.f), 2);
     sphere_interop.unmap();
 #endif
 }
@@ -306,13 +306,39 @@ void Cloth::init()
     }
 
 
+    // COLLIDERS
+    std::vector<CUDA::Sphere> colliders(numberOfColliderSpheres);
+    for (int i = 0; i < numberOfColliderSpheres; ++i)
+    {
+        CUDA::Sphere& s = colliders[i];
+        s.mass = 1.f;
+        s.radius = 5.f;
+        s.color = glm::vec4(0.f, 1.f, 1.f, 1.f);
+        s.force = glm::vec3();
+        s.id = i;
+        s.velocity = glm::vec3(-10.f, 0.f, 0.f);
 
+        s.position = glm::vec3();
+    }
+
+    colliderSphereBuffer.set(colliders);
+    colliderSphereBuffer.setDrawMode(GL_POINTS);
+    collider_interop.registerGLBuffer(colliderSphereBuffer.getVBO());
+
+    collider_interop.map();
+    void* spheres_ptr = collider_interop.getDevicePtr();
+    CUDA::resetSpheres(static_cast<CUDA::Sphere*>(spheres_ptr), numberOfColliderSpheres, 1, 1, glm::vec3(100.f, 30.f, 10.f), 20.f);
+    collider_interop.unmap();
+
+    initTiming();
 }
 
 void Cloth::shutdown()
 {
     for (int c = 0; c < numberOfCloths; ++c)
         cudaCloth[c].shutdown();
+
+    shutdownTiming();
 }
 
 void Cloth::update(float dt, CUDA::Plane* planes, int planeCount)
@@ -323,12 +349,19 @@ void Cloth::update(float dt, CUDA::Plane* planes, int planeCount)
     fixated.z = (m-1) * n;
     fixated.w = (m-1) * n + (n-1);
 
+    collider_interop.map();
+    CUDA::Sphere* spheres_ptr = static_cast<CUDA::Sphere*>(collider_interop.getDevicePtr());
+    CUDA::updateAllSpheresSortAndSweep(spheres_ptr, planes, numberOfColliderSpheres, planeCount, dt);
+
     for (int c = 0; c < numberOfCloths; ++c)
     {
         sphere_interop[c].map();
-        cudaCloth[c].update(static_cast<CUDA::Sphere*>(sphere_interop[c].getDevicePtr()), numberOfSpheres[c], planes, planeCount, dt, fixated);
+        cudaCloth[c].update(static_cast<CUDA::Sphere*>(sphere_interop[c].getDevicePtr()), numberOfSpheres[c], planes, planeCount, spheres_ptr, numberOfColliderSpheres, dt, fixated);
         sphere_interop[c].unmap();
     }
+
+
+    collider_interop.unmap();
 }
 
 void Cloth::render(Camera *cam)
@@ -337,6 +370,7 @@ void Cloth::render(Camera *cam)
     sphereShader->uploadAll(mat4(), cam->view, cam->proj);
     for (int c = 0; c < numberOfCloths; ++c)
         sphereBuffer[c].bindAndDraw();
+    colliderSphereBuffer.bindAndDraw();
     sphereShader->unbind();
 }
 

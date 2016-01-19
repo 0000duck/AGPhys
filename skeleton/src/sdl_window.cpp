@@ -7,7 +7,7 @@ sdl_Window::sdl_Window(const std::string &name, int width, int height):name(name
     cam.setProj(60.0f,aspect,0.1f,1000.0f);
     cam.setView(vec3(0,0,-10),vec3(0),vec3(0,1,0));
 
-    ccam.setPosition(vec3(0,2,5));
+    ccam.setPosition(vec3(0,2,100));
 
     initWindow();
 
@@ -114,7 +114,8 @@ void sdl_Window::startMainLoop(){
 
 
         ccam.update(dt);
-        renderer.update(dt);
+        if (!paused)
+            renderer.update(dt);
         renderer.render(&cam);
         SDL_GL_SwapWindow( gWindow );
     }
@@ -128,6 +129,10 @@ void sdl_Window::keyPressed(int key)
     switch(key){
         case SDLK_ESCAPE:
             running = false;
+            break;
+        case SDLK_p:
+            paused = !paused;
+            break;
     }
 }
 

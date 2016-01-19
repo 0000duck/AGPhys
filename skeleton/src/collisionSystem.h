@@ -19,6 +19,8 @@ class Cloth
 {
 public:
     static const int numberOfCloths = 4;
+    static const int numberOfColliderSpheres = 20;
+
 
     void init();
     void shutdown();
@@ -31,6 +33,8 @@ private:
     int numberOfSpheres[numberOfCloths];
     VertexBuffer<CUDA::Sphere> sphereBuffer[numberOfCloths];
     Interop	sphere_interop[numberOfCloths];
+    VertexBuffer<CUDA::Sphere> colliderSphereBuffer;
+    Interop collider_interop;
 
     MVPShader* sphereShader;
 

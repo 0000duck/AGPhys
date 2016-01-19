@@ -15,6 +15,7 @@ protected:
     int width;
     int height;
     bool running = false;
+    bool paused = false;
     PerspectiveCamera cam;
     Controllable_Camera<PerspectiveCamera> ccam;
 
