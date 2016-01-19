@@ -13,7 +13,7 @@ using namespace CUDA;
 /*
  * returns by how much the sphere intersects the plane and -1 if no collision
  */
-__device__ float collideSpherePlane(Sphere& sphere, Plane& plane)
+__device__ inline float collideSpherePlane(Sphere& sphere, Plane& plane)
 {
     if (dot(sphere.velocity, plane.normal) > 0)
     {
@@ -32,7 +32,7 @@ __device__ float collideSpherePlane(Sphere& sphere, Plane& plane)
 /*
  * returns by how much the spheres intersects each other and -1 if no collision
  */
-__device__ float collideSphereSphere(Sphere& sphere1, Sphere& sphere2)
+__device__ inline float collideSphereSphere(Sphere& sphere1, Sphere& sphere2)
 {
     if (length(sphere1.position - sphere2.position) <= sphere1.radius + sphere2.radius)
     {
@@ -89,14 +89,14 @@ __device__ float collideSphereSphere(Sphere& sphere1, Sphere& sphere2)
 
 /// ------------------------------------------------------ COLLISION RESPONSE  ------------------------------------------------------
 
-__device__ void kinematicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane, float penetration)
+__device__ inline void kinematicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane, float penetration)
 {
     float3 colNormal = plane.normal;
     sphere.velocity = 0.9 * reflect(sphere.velocity, colNormal);
     sphere.position += colNormal * penetration;
 }
 
-__device__ void kinematicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sphere2, float penetration)
+__device__ inline void kinematicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sphere2, float penetration)
 {
     float3 colNormal = normalize(sphere2.position - sphere1.position);
     sphere1.velocity = 0.9 * reflect(sphere1.velocity, colNormal);
@@ -106,7 +106,7 @@ __device__ void kinematicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& 
     sphere2.position += colNormal * 0.5 * penetration;
 }
 
-__device__ void dynamicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane, float penetration, float dt)
+__device__ inline void dynamicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane, float penetration, float dt)
 {
     float invMass = 1.0 / sphere.mass;
     float vNormal = -length(dot(sphere.velocity,plane.normal) * plane.normal);
@@ -136,7 +136,7 @@ __device__ void dynamicCollisionResponseSpherePlane(Sphere& sphere, Plane& plane
     sphere.force += momentum;
 }
 
-__device__ void dynamicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sphere2, float penetration)
+__device__ inline void dynamicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sphere2, float penetration)
 {
     float3 colNormal = normalize(sphere2.position - sphere1.position);
     float3 vRel      = (dot(sphere1.velocity, colNormal) * colNormal) - (dot(sphere2.velocity, colNormal) * colNormal);
@@ -164,7 +164,7 @@ __device__ void dynamicCollisionResponseSphereSphere(Sphere& sphere1, Sphere& sp
 
 /// ------------------------------------------------------ ELASTIC COLLISION RESPONSE  ------------------------------------------------------
 
-__device__ void elasticCollision(Sphere& sphere1, Sphere& sphere2, float penetration)
+__device__ inline void elasticCollision(Sphere& sphere1, Sphere& sphere2, float penetration)
 {
     float3 colNormal = normalize(sphere1.position - sphere2.position);
     float3 _v1 = sphere1.velocity + (2 * dot(sphere2.velocity - sphere1.velocity, colNormal)) / (1 / sphere1.mass + 1 / sphere2.mass) * (1 / sphere1.mass) * colNormal;
@@ -174,14 +174,6 @@ __device__ void elasticCollision(Sphere& sphere1, Sphere& sphere2, float penetra
 
     sphere1.position += colNormal * 0.5 * penetration;
     sphere2.position -= colNormal * 0.5 * penetration;
-}
-
-
-/// ---------------------------------------------------- RIGID BODY COLLISION RESPONSE  -----------------------------------------------------
-
-__device__ void rigidBodyCollisionResponse()
-{
-
 }
 
 

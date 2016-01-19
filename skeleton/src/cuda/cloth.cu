@@ -4,14 +4,17 @@
 #include <ctime>
 #include "helper_math.h"	// overload operators for floatN
 #include "helper_cuda.h"
-#include "cloth.h"
 #include <iostream>
+
+
+#include "cloth.h"
+#include "collision.h"
 
 
 namespace CUDA
 {
 
-__device__ void atomicAddVelocity(Sphere& s, float3 v)
+__device__ inline void atomicAddVelocity(Sphere& s, float3 v)
 {
     atomicAdd(&s.velocity.x, v.x);
     atomicAdd(&s.velocity.y, v.y);
@@ -46,14 +49,28 @@ __global__ void computeForces(Spring* springs, int numberOfSprings, Sphere* sphe
     }
 }
 
-__global__ void integrateMassPoints(Sphere* spheres, int numberOfSpheres, float dt, int fixated0, int fixated1, int fixated2, int fixated3)
+__device__ void collideWithPlanes(Sphere& sphere, Plane* planes, int numberOfPlanes, float dt)
+{
+    for (int p = 0; p < numberOfPlanes; ++p)
+    {
+        Plane& plane = planes[p];
+        float penetration = collideSpherePlane(sphere, plane);
+        if (penetration != -1.0f)
+        {
+            //sphere.color = make_float4(1);
+
+            dynamicCollisionResponseSpherePlane(sphere, plane, penetration, dt);
+        }
+    }
+
+}
+
+__global__ void integrateMassPoints(Sphere* spheres, int numberOfSpheres, Plane* planes, int numberOfPlanes, float dt, int fixated0, int fixated1, int fixated2, int fixated3)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < numberOfSpheres)
     {
         Sphere& s = spheres[tid];
-
-
 
         if (s.id != fixated0 && s.id != fixated1 && s.id != fixated2 && s.id != fixated3)
         {
@@ -66,6 +83,9 @@ __global__ void integrateMassPoints(Sphere* spheres, int numberOfSpheres, float 
         {
             s.color = make_float4(0.f, 0.f, 1.f, 1.f);
         }
+
+        collideWithPlanes(s, planes, numberOfPlanes, dt);
+
     }
 }
 
@@ -171,13 +191,13 @@ void Cloth::shutdown()
     cudaFree(dev_springs);
 }
 
-void Cloth::update(Sphere* spheres, int numberOfSpheres, float dt, glm::vec4 fixated)
+void Cloth::update(Sphere* spheres, int numberOfSpheres, Plane *planes, int numberOfPlanes, float dt, glm::vec4 fixated)
 {
     int threadsPerBlock = 128;
     int blocks = numberOfSpheres / threadsPerBlock + 1;
 
     // INTEGRATE
-    integrateMassPoints<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, dt, fixated.x, fixated.y, fixated.z, fixated.w);
+    integrateMassPoints<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres, planes, numberOfPlanes, dt, fixated.x, fixated.y, fixated.z, fixated.w);
 
 
     //resetForces<<<blocks, threadsPerBlock>>>(spheres, numberOfSpheres);

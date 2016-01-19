@@ -4,7 +4,7 @@
 sdl_Window::sdl_Window(const std::string &name, int width, int height):name(name),width(width),height(height),cam("test cam"),ccam(&cam)
 {
     float aspect = (float)width/(float)height;
-    cam.setProj(60.0f,aspect,0.1f,100.0f);
+    cam.setProj(60.0f,aspect,0.1f,1000.0f);
     cam.setView(vec3(0,0,-10),vec3(0),vec3(0,1,0));
 
     ccam.setPosition(vec3(0,2,5));

@@ -18,21 +18,23 @@
 class Cloth
 {
 public:
+    static const int numberOfCloths = 4;
+
     void init();
     void shutdown();
 
-    void update(float dt);
+    void update(float dt, CUDA::Plane* planes, int planeCount);
     void render(Camera* cam);
 
 
 private:
-    int numberOfSpheres;
-    VertexBuffer<CUDA::Sphere> sphereBuffer;
-    Interop	sphere_interop;
+    int numberOfSpheres[numberOfCloths];
+    VertexBuffer<CUDA::Sphere> sphereBuffer[numberOfCloths];
+    Interop	sphere_interop[numberOfCloths];
 
     MVPShader* sphereShader;
 
-    CUDA::Cloth cudaCloth;
+    CUDA::Cloth cudaCloth[numberOfCloths];
     int m, n;
 };
 

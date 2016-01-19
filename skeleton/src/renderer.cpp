@@ -26,13 +26,13 @@ void myRenderer::init()
     std::vector<CUDA::Plane> ps;
 
     // bottom
-    Grid g(vec3(0, -1, 0),vec3(0,0,1),vec3(1,0,0));
+    Grid g(vec3(0, 0, 0),vec3(0,0,1),vec3(1,0,0));
     g.createBuffers(grid_bottom, 10, 10);
     ps.push_back(CUDA::Plane());
-    ps[0].center = vec3(0, -1, 0);
+    ps[0].center = vec3(0, 0, 0);
     ps[0].normal = glm::normalize(vec3(0, 1, 0));
     ps[0].d     = glm::dot(ps[0].center, ps[0].normal);
-
+/*
     // left
     g = Grid(vec3(-9, 8, 0), vec3(0,0,1), vec3(0,1,0));
     g.createBuffers(grid_left, 10, 10);
@@ -64,7 +64,7 @@ void myRenderer::init()
     ps[4].center = vec3(0, 8, -9);
     ps[4].normal = glm::normalize(vec3(0, 0, 1));
     ps[4].d     = glm::dot(ps[4].center, ps[4].normal);
-
+*/
     planeCount = ps.size();
     planeBuffer.set(ps);
     planeBuffer.setDrawMode(GL_POINTS);
@@ -89,7 +89,7 @@ void myRenderer::update(float dt){
     plane_interop.map();
     void* plane_ptr = plane_interop.getDevicePtr();
     //collisionSystem.update(dt, static_cast<CUDA::Plane*>(plane_ptr), planeCount);
-    cloth.update(dt);
+    cloth.update(dt, static_cast<CUDA::Plane*>(plane_ptr), planeCount);
     plane_interop.unmap();
 }
 
@@ -102,13 +102,14 @@ void myRenderer::render(Camera *cam)
     glDepthMask(GL_TRUE);
 
     gridShader->bind();
-    gridShader->uploadAll(mat4(),cam->view,cam->proj);
+    mat4 m = glm::scale(mat4(), vec3(10.f));
+    gridShader->uploadAll(m,cam->view,cam->proj);
     gridShader->uploadColor(vec4(0.7f));
     grid_bottom.bindAndDraw();
-    grid_left.bindAndDraw();
-    grid_right.bindAndDraw();
-    grid_front.bindAndDraw();
-    grid_back.bindAndDraw();
+    //grid_left.bindAndDraw();
+    //grid_right.bindAndDraw();
+    //grid_front.bindAndDraw();
+    //grid_back.bindAndDraw();
     gridShader->unbind();
 
     //particleSystem.render(cam);

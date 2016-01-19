@@ -273,45 +273,49 @@ void Cloth::init()
     m = 50;
     n = 50;
     float springLength = 1.5f;
-    glm::vec3 corner(-25.f, 10.f, -25.f);
+    glm::vec3 corner(-25.f, 25.f, -25.f);
 
-    numberOfSpheres = m * n;
-    std::vector<CUDA::Sphere> spheres(numberOfSpheres);
-    for (int i = 0; i < numberOfSpheres; ++i)
+    for (int c = 0; c < numberOfCloths; ++c)
     {
-        CUDA::Sphere& s = spheres[i];
-        s.mass = 1.f;
-        s.radius = 0.5f;
-        s.color = glm::vec4(1.f, 0.f, 0.f, 1.f);
-        s.force = glm::vec3(0.f);
-        s.id = i;
-        s.velocity = glm::vec3(0.f);
+        numberOfSpheres[c] = m * n;
+        std::vector<CUDA::Sphere> spheres(numberOfSpheres[c]);
+        for (int i = 0; i < numberOfSpheres[c]; ++i)
+        {
+            CUDA::Sphere& s = spheres[i];
+            s.mass = 1.f;
+            s.radius = 0.5f;
+            s.color = glm::vec4(0.f + ((float)c / (float)(numberOfCloths-1)), 1.f - ((float)c / (float)(numberOfCloths-1)), 0.f, 1.f);
+            s.force = glm::vec3(0.f);
+            s.id = i;
+            s.velocity = glm::vec3(0.f);
 
-        int xPos = i % n;
-        int zPos = (i - xPos) / n;
-        s.position = glm::vec3(xPos * springLength + corner.x, corner.y, zPos * springLength + corner.z);
+            int xPos = i % n;
+            int zPos = (i - xPos) / n;
 
-        std::cout << "Sphere " << i << ": " << s.position.x << ", " << s.position.z << std::endl;
+            s.position = glm::vec3(xPos * springLength + corner.x, corner.y, zPos * springLength + corner.z);
+        }
+
+        sphereBuffer[c].set(spheres);
+        sphereBuffer[c].setDrawMode(GL_POINTS);
+        sphere_interop[c].registerGLBuffer(sphereBuffer[c].getVBO());
+        sphereShader = ShaderLoader::instance()->load<MVPShader>("particles.glsl");
+
+        cudaCloth[c].init(m, n, springLength);
+
+        corner.y += 75;
     }
 
-    // test
-    //spheres[0].position.x -= 0.5f;
 
-    sphereBuffer.set(spheres);
-    sphereBuffer.setDrawMode(GL_POINTS);
-    sphere_interop.registerGLBuffer(sphereBuffer.getVBO());
-    sphereShader = ShaderLoader::instance()->load<MVPShader>("particles.glsl");
-
-    cudaCloth.init(m, n, springLength);
 
 }
 
 void Cloth::shutdown()
 {
-    cudaCloth.shutdown();
+    for (int c = 0; c < numberOfCloths; ++c)
+        cudaCloth[c].shutdown();
 }
 
-void Cloth::update(float dt)
+void Cloth::update(float dt, CUDA::Plane* planes, int planeCount)
 {
     glm::vec4 fixated;
     fixated.x = 0;
@@ -319,16 +323,20 @@ void Cloth::update(float dt)
     fixated.z = (m-1) * n;
     fixated.w = (m-1) * n + (n-1);
 
-    sphere_interop.map();
-    cudaCloth.update(static_cast<CUDA::Sphere*>(sphere_interop.getDevicePtr()), numberOfSpheres, dt, fixated);
-    sphere_interop.unmap();
+    for (int c = 0; c < numberOfCloths; ++c)
+    {
+        sphere_interop[c].map();
+        cudaCloth[c].update(static_cast<CUDA::Sphere*>(sphere_interop[c].getDevicePtr()), numberOfSpheres[c], planes, planeCount, dt, fixated);
+        sphere_interop[c].unmap();
+    }
 }
 
 void Cloth::render(Camera *cam)
 {
     sphereShader->bind();
     sphereShader->uploadAll(mat4(), cam->view, cam->proj);
-    sphereBuffer.bindAndDraw();
+    for (int c = 0; c < numberOfCloths; ++c)
+        sphereBuffer[c].bindAndDraw();
     sphereShader->unbind();
 }
 

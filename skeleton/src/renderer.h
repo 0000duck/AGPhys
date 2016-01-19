@@ -17,10 +17,10 @@ public:
 
 
     VertexBuffer<VertexN> grid_bottom;
-    VertexBuffer<VertexN> grid_left;
-    VertexBuffer<VertexN> grid_right;
-    VertexBuffer<VertexN> grid_front;
-    VertexBuffer<VertexN> grid_back;
+    //VertexBuffer<VertexN> grid_left;
+    //VertexBuffer<VertexN> grid_right;
+    //VertexBuffer<VertexN> grid_front;
+    //VertexBuffer<VertexN> grid_back;
 
 
     VertexBuffer<CUDA::Plane> planeBuffer;
