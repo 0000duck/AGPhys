@@ -36,28 +36,6 @@ __device__ bool isFix(Sphere& s, int4 fix)
     return s.id == fix.x || s.id == fix.y || s.id == fix.z || s.id == fix.w;
 }
 
-/// ----------------------------------------------------------------------------------------------------------------
-/// ------------------------------------------------- SPRING BASED -------------------------------------------------
-/// ----------------------------------------------------------------------------------------------------------------
-
-__global__ void computeForces(Spring* springs, int numberOfSprings, Sphere* spheres)
-{
-    int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    if (tid < numberOfSprings)
-    {
-        Spring& spring  = springs[tid];
-        Sphere& s1      = spheres[spring.index1];
-        Sphere& s2      = spheres[spring.index2];
-
-        float l = length(s2.position - s1.position);
-        float3 deformation = (s2.position - s1.position) / l * (l - spring.length);
-        float3 force = -spring.hardness * deformation;
-
-        atomicAddVelocity(s1, -force / s1.mass);
-        atomicAddVelocity(s2, force / s1.mass);
-    }
-}
-
 __device__ void collideWithPlanes(Sphere& sphere, Plane* planes, int numberOfPlanes, float dt)
 {
     for (int p = 0; p < numberOfPlanes; ++p)
@@ -94,6 +72,31 @@ __device__ void collideWithSpheres(Sphere& sphere, Sphere* colliders, int number
         elasticCollision(sphere, *maxCollider, max);
         sphere.velocity *= 0.5f;
         maxCollider->velocity *= 0.5f;
+    }
+}
+
+
+
+
+/// ----------------------------------------------------------------------------------------------------------------
+/// ------------------------------------------------- SPRING BASED -------------------------------------------------
+/// ----------------------------------------------------------------------------------------------------------------
+
+__global__ void computeForces(Spring* springs, int numberOfSprings, Sphere* spheres)
+{
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    if (tid < numberOfSprings)
+    {
+        Spring& spring  = springs[tid];
+        Sphere& s1      = spheres[spring.index1];
+        Sphere& s2      = spheres[spring.index2];
+
+        float l = length(s2.position - s1.position);
+        float3 deformation = (s2.position - s1.position) / l * (l - spring.length);
+        float3 force = -spring.hardness * deformation;
+
+        atomicAddVelocity(s1, -force / s1.mass);
+        atomicAddVelocity(s2, force / s1.mass);
     }
 }
 
@@ -141,8 +144,9 @@ __global__ void estimatePositions(Sphere* spheres, int numberOfSpheres, Plane* p
             collideWithPlanes(s, planes, numberOfPlanes, dt);
             collideWithSpheres(s, colliders, numberOfColliders);
 
-            s.velocity.y -= 9.81f * dt;
-            s.velocity *= 0.999;
+            //s.velocity.y -= 9.81f * dt;
+            //s.velocity *= 0.999;
+            s.velocity = (s.velocity - dt * make_float3(0.f, 9.81f, 0.f)) * 0.999;
             s.estimatedPosition = s.position + s.velocity * dt;
         }
         else
@@ -200,23 +204,26 @@ __global__ void projectConstraints(LinearConstraint* constraints, int numberOfCo
     }
     else if (tid < numberOfConstraints + numberOfBendingConstraints)
     {
+
+        // does not work perfectly
+/*
         BendingConstraint& constraint = b_constraints[tid - numberOfConstraints];
         Sphere& s1 = spheres[constraint.index1];
         Sphere& s2 = spheres[constraint.index2];
         Sphere& s3 = spheres[constraint.index3];
         Sphere& s4 = spheres[constraint.index4];
 
-        /*
-         *   s1 --- s2
-         *    |   /  |
-         *    |  /   |
-         *   s3 --- s4
-         */
+        //
+        //   s1 --- s2
+        //    |   /  |
+        //    |  /   |
+        //   s3 --- s4
+        //
 
         float3 p1 = make_float3(0.f);
-        float3& p2 = s2.estimatedPosition;
-        float3& p3 = s3.estimatedPosition;
-        float3& p4 = s4.estimatedPosition;
+        float3 p2 = s2.estimatedPosition - s1.estimatedPosition;
+        float3 p3 = s3.estimatedPosition - s1.estimatedPosition;
+        float3 p4 = s4.estimatedPosition - s1.estimatedPosition;
 
         float w1 = 1.f / s1.mass;
         float w2 = 1.f / s2.mass;
@@ -240,11 +247,40 @@ __global__ void projectConstraints(LinearConstraint* constraints, int numberOfCo
         float3 correction3 = -(w3 * sqrt(1.0 - constraint.d) * (acos(constraint.d) - phi)) / sum * q3;
         float3 correction4 = -(w4 * sqrt(1.0 - constraint.d) * (acos(constraint.d) - phi)) / sum * q4;
 
-        updateEstimatedPosition(s1, correction1 / 100);
-        updateEstimatedPosition(s2, correction2 / 100);
-        updateEstimatedPosition(s3, correction3 / 100);
-        updateEstimatedPosition(s4, correction4 / 100);
+        float damp = .01f;
 
+        if (isFix(s1, fix))
+        {
+            updateEstimatedPosition(s2, correction2 * damp);
+            updateEstimatedPosition(s3, correction3 * damp);
+            updateEstimatedPosition(s4, correction4 * damp);
+        }
+        else if (isFix(s2, fix))
+        {
+            updateEstimatedPosition(s1, correction1 * damp);
+            updateEstimatedPosition(s3, correction3 * damp);
+            updateEstimatedPosition(s4, correction4 * damp);
+        }
+        else if (isFix(s3, fix))
+        {
+            updateEstimatedPosition(s1, correction1 * damp);
+            updateEstimatedPosition(s2, correction2 * damp);
+            updateEstimatedPosition(s4, correction4 * damp);
+        }
+        else if (isFix(s4, fix))
+        {
+            updateEstimatedPosition(s1, correction1 * damp);
+            updateEstimatedPosition(s2, correction2 * damp);
+            updateEstimatedPosition(s3, correction3 * damp);
+        }
+        else
+        {
+            updateEstimatedPosition(s1, correction1 * damp);
+            updateEstimatedPosition(s2, correction2 * damp);
+            updateEstimatedPosition(s3, correction3 * damp);
+            updateEstimatedPosition(s4, correction4 * damp);
+        }
+*/
     }
 }
 
