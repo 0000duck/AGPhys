@@ -16,8 +16,9 @@ sdl_Window::sdl_Window(const std::string &name, int width, int height):name(name
 
     eventHandler.addKeyListener(this);
 
-    eventHandler.addKeyListener(&renderer.particleSystem);
-    eventHandler.addKeyListener(&renderer.collisionSystem);
+    //eventHandler.addKeyListener(&renderer.particleSystem);
+    //eventHandler.addKeyListener(&renderer.collisionSystem);
+    eventHandler.addKeyListener(&renderer.cloth);
 }
 
 bool sdl_Window::initWindow()

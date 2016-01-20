@@ -386,7 +386,7 @@ void updateAllSpheresBruteForce(Sphere* spheres, Plane* planes, int numberOfSphe
     if (accDts >= 1.0f)
     {
         float timePerFrame = accTime / numberOfSamples;
-        std::cout << "BRUTE FORCE: Number of Spheres: " << numberOfSpheres << ", Average Step Time: " << timePerFrame << "ms" << std::endl;
+        //std::cout << "BRUTE FORCE: Number of Spheres: " << numberOfSpheres << ", Average Step Time: " << timePerFrame << "ms" << std::endl;
         std::cout.flush();
 
         accTime = 0.0f;
@@ -427,7 +427,7 @@ void updateAllSpheresSortAndSweep(Sphere* spheres, Plane* planes, int numberOfSp
     if (accDts >= 1.0f)
     {
         float timePerFrame = accTime / numberOfSamples;
-        std::cout << "SORT & SWEEP: Number of Spheres: " << numberOfSpheres << ", Average Step Time: " << timePerFrame << "ms" << std::endl;
+        //std::cout << "SORT & SWEEP: Number of Spheres: " << numberOfSpheres << ", Average Step Time: " << timePerFrame << "ms" << std::endl;
 
         accTime = 0.0f;
         accDts = 0.0f;
@@ -469,7 +469,7 @@ void updateAllSpheresLinkedCell(Sphere* spheres, Plane* planes, int numberOfSphe
     if (accDts >= 1.0f)
     {
         float timePerFrame = accTime / numberOfSamples;
-        std::cout << "LINKED CELL: Number of Spheres: " << numberOfSpheres << ", Average Step Time: " << timePerFrame << "ms" << std::endl;
+        //std::cout << "LINKED CELL: Number of Spheres: " << numberOfSpheres << ", Average Step Time: " << timePerFrame << "ms" << std::endl;
 
         accTime = 0.0f;
         accDts = 0.0f;

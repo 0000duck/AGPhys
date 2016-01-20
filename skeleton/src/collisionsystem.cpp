@@ -356,7 +356,10 @@ void Cloth::update(float dt, CUDA::Plane* planes, int planeCount)
     for (int c = 0; c < numberOfCloths; ++c)
     {
         sphere_interop[c].map();
-        cudaCloth[c].update(static_cast<CUDA::Sphere*>(sphere_interop[c].getDevicePtr()), numberOfSpheres[c], planes, planeCount, spheres_ptr, numberOfColliderSpheres, dt, fixated);
+        if (!positionbased)
+            cudaCloth[c].updateWithSprings(static_cast<CUDA::Sphere*>(sphere_interop[c].getDevicePtr()), numberOfSpheres[c], planes, planeCount, spheres_ptr, numberOfColliderSpheres, dt, fixated);
+        else
+            cudaCloth[c].updatePositionBased(static_cast<CUDA::Sphere*>(sphere_interop[c].getDevicePtr()), numberOfSpheres[c], planes, planeCount, spheres_ptr, numberOfColliderSpheres, dt, fixated);
         sphere_interop[c].unmap();
     }
 
@@ -374,6 +377,26 @@ void Cloth::render(Camera *cam)
     sphereShader->unbind();
 }
 
+
+void Cloth::keyPressed(int key)
+{
+    switch(key)
+    {
+        case SDLK_4:
+            positionbased = false;
+            std::cout << "Switched to mass spring method" << std::endl;
+            break;
+        case SDLK_5:
+            positionbased = true;
+            std::cout << "Switched to position based method" << std::endl;
+            break;
+    }
+}
+
+void Cloth::keyReleased(int key)
+{
+
+}
 
 
 template<>

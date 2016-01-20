@@ -15,7 +15,7 @@
 #include "cuda/interop.h"
 #include "cuda/cloth.h"
 
-class Cloth
+class Cloth : public SDL_KeyListener
 {
 public:
     static const int numberOfCloths = 4;
@@ -27,6 +27,9 @@ public:
 
     void update(float dt, CUDA::Plane* planes, int planeCount);
     void render(Camera* cam);
+
+    void keyPressed(int key);
+    void keyReleased(int key);
 
 
 private:
@@ -40,6 +43,8 @@ private:
 
     CUDA::Cloth cudaCloth[numberOfCloths];
     int m, n;
+
+    bool positionbased = false;
 };
 
 class CollisionSystem : public SDL_KeyListener

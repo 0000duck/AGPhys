@@ -17,6 +17,7 @@ public:
     vec3_t velocity;
     float mass;
     vec3_t force;
+    vec3_t estimatedPosition;
 
     int sphereCollider;
     int planeCollider;
